@@ -1,0 +1,7 @@
+services:
+  chess-com-mcp:
+    build: .
+    image: chess-com-mcp:latest
+    container_name: chess-com-mcp
+    stdin_open: true
+    restart: unless-stopped
