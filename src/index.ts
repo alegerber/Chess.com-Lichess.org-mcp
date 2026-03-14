@@ -17,10 +17,7 @@ function formatTimestamp(ts: number): string {
 }
 
 function formatProfile(p: api.PlayerProfile): string {
-  const lines: string[] = [
-    `Username: ${p.username}`,
-    `URL: ${p.url}`,
-  ];
+  const lines: string[] = [`Username: ${p.username}`, `URL: ${p.url}`];
   if (p.title) lines.push(`Title: ${p.title}`);
   if (p.name) lines.push(`Name: ${p.name}`);
   lines.push(`Status: ${p.status}`);
@@ -47,9 +44,7 @@ server.registerTool(
     description:
       "Get a Chess.com player's profile information including username, title, status, FIDE rating, join date, and more.",
     inputSchema: {
-      username: z
-        .string()
-        .describe("Chess.com username"),
+      username: z.string().describe("Chess.com username"),
     },
   },
   async ({ username }) => {
@@ -67,9 +62,7 @@ server.registerTool(
     description:
       "Get a Chess.com player's ratings, win/loss/draw records, and other statistics across all game types (daily, rapid, blitz, bullet, tactics, puzzle rush, etc).",
     inputSchema: {
-      username: z
-        .string()
-        .describe("Chess.com username"),
+      username: z.string().describe("Chess.com username"),
     },
   },
   async ({ username }) => {
@@ -87,9 +80,7 @@ server.registerTool(
     description:
       "Check if a Chess.com player has been online in the last 5 minutes.",
     inputSchema: {
-      username: z
-        .string()
-        .describe("Chess.com username"),
+      username: z.string().describe("Chess.com username"),
     },
   },
   async ({ username }) => {
@@ -111,12 +102,9 @@ server.registerTool(
   "get_current_daily_games",
   {
     title: "Get Current Daily Games",
-    description:
-      "Get the daily chess games a player is currently playing.",
+    description: "Get the daily chess games a player is currently playing.",
     inputSchema: {
-      username: z
-        .string()
-        .describe("Chess.com username"),
+      username: z.string().describe("Chess.com username"),
     },
   },
   async ({ username }) => {
@@ -139,12 +127,9 @@ server.registerTool(
   "get_games_to_move",
   {
     title: "Get Games To Move",
-    description:
-      "Get daily chess games where it is the player's turn to move.",
+    description: "Get daily chess games where it is the player's turn to move.",
     inputSchema: {
-      username: z
-        .string()
-        .describe("Chess.com username"),
+      username: z.string().describe("Chess.com username"),
     },
   },
   async ({ username }) => {
@@ -170,9 +155,7 @@ server.registerTool(
     description:
       "Get a list of monthly archive URLs available for a player. Each URL can be used to fetch the games for that month.",
     inputSchema: {
-      username: z
-        .string()
-        .describe("Chess.com username"),
+      username: z.string().describe("Chess.com username"),
     },
   },
   async ({ username }) => {
@@ -198,20 +181,9 @@ server.registerTool(
     description:
       "Get all games a player played in a specific month. Returns full game data including PGN, results, and ratings.",
     inputSchema: {
-      username: z
-        .string()
-        .describe("Chess.com username"),
-      year: z
-        .number()
-        .int()
-        .min(2007)
-        .describe("Four-digit year (e.g. 2024)"),
-      month: z
-        .number()
-        .int()
-        .min(1)
-        .max(12)
-        .describe("Month number (1-12)"),
+      username: z.string().describe("Chess.com username"),
+      year: z.number().int().min(2007).describe("Four-digit year (e.g. 2024)"),
+      month: z.number().int().min(1).max(12).describe("Month number (1-12)"),
     },
   },
   async ({ username, year, month }) => {
@@ -238,9 +210,7 @@ server.registerTool(
     title: "Get Player Clubs",
     description: "Get the list of clubs a player is a member of.",
     inputSchema: {
-      username: z
-        .string()
-        .describe("Chess.com username"),
+      username: z.string().describe("Chess.com username"),
     },
   },
   async ({ username }) => {
@@ -258,9 +228,7 @@ server.registerTool(
     description:
       "Get tournaments a player has participated in, is currently in, or is registered for.",
     inputSchema: {
-      username: z
-        .string()
-        .describe("Chess.com username"),
+      username: z.string().describe("Chess.com username"),
     },
   },
   async ({ username }) => {
@@ -288,9 +256,7 @@ server.registerTool(
     description:
       "Get team matches a player has participated in, is currently in, or is registered for.",
     inputSchema: {
-      username: z
-        .string()
-        .describe("Chess.com username"),
+      username: z.string().describe("Chess.com username"),
     },
   },
   async ({ username }) => {
@@ -339,9 +305,7 @@ server.registerTool(
     inputSchema: {
       url_id: z
         .string()
-        .describe(
-          'Club URL ID / slug (e.g. "chess-com-developer-community")',
-        ),
+        .describe('Club URL ID / slug (e.g. "chess-com-developer-community")'),
     },
   },
   async ({ url_id }) => {
@@ -368,9 +332,7 @@ server.registerTool(
     description:
       "Get a club's members grouped by activity level (weekly, monthly, all-time).",
     inputSchema: {
-      url_id: z
-        .string()
-        .describe("Club URL ID / slug"),
+      url_id: z.string().describe("Club URL ID / slug"),
     },
   },
   async ({ url_id }) => {
@@ -381,9 +343,7 @@ server.registerTool(
       `All-time: ${data.all_time.length}`,
     ].join("\n");
     return {
-      content: [
-        { type: "text", text: `${summary}\n\n${jsonBlock(data)}` },
-      ],
+      content: [{ type: "text", text: `${summary}\n\n${jsonBlock(data)}` }],
     };
   },
 );
@@ -395,9 +355,7 @@ server.registerTool(
     description:
       "Get a club's team matches grouped by status (finished, in progress, registered).",
     inputSchema: {
-      url_id: z
-        .string()
-        .describe("Club URL ID / slug"),
+      url_id: z.string().describe("Club URL ID / slug"),
     },
   },
   async ({ url_id }) => {
@@ -439,14 +397,8 @@ server.registerTool(
     description:
       "Get details about a specific round of a tournament, including groups and players.",
     inputSchema: {
-      url_id: z
-        .string()
-        .describe("Tournament URL ID / slug"),
-      round: z
-        .number()
-        .int()
-        .min(1)
-        .describe("Round number"),
+      url_id: z.string().describe("Tournament URL ID / slug"),
+      round: z.number().int().min(1).describe("Round number"),
     },
   },
   async ({ url_id, round }) => {
@@ -464,19 +416,9 @@ server.registerTool(
     description:
       "Get details about a specific group within a tournament round, including games and standings.",
     inputSchema: {
-      url_id: z
-        .string()
-        .describe("Tournament URL ID / slug"),
-      round: z
-        .number()
-        .int()
-        .min(1)
-        .describe("Round number"),
-      group: z
-        .number()
-        .int()
-        .min(1)
-        .describe("Group number"),
+      url_id: z.string().describe("Tournament URL ID / slug"),
+      round: z.number().int().min(1).describe("Round number"),
+      group: z.number().int().min(1).describe("Group number"),
     },
   },
   async ({ url_id, round, group }) => {
@@ -496,10 +438,7 @@ server.registerTool(
     description:
       "Get details about a daily team match including teams, players, and scores.",
     inputSchema: {
-      match_id: z
-        .number()
-        .int()
-        .describe("Team match ID (numeric)"),
+      match_id: z.number().int().describe("Team match ID (numeric)"),
     },
   },
   async ({ match_id }) => {
@@ -514,18 +453,10 @@ server.registerTool(
   "get_team_match_board",
   {
     title: "Get Team Match Board",
-    description:
-      "Get details about a specific board in a daily team match.",
+    description: "Get details about a specific board in a daily team match.",
     inputSchema: {
-      match_id: z
-        .number()
-        .int()
-        .describe("Team match ID (numeric)"),
-      board: z
-        .number()
-        .int()
-        .min(1)
-        .describe("Board number"),
+      match_id: z.number().int().describe("Team match ID (numeric)"),
+      board: z.number().int().min(1).describe("Board number"),
     },
   },
   async ({ match_id, board }) => {
@@ -543,10 +474,7 @@ server.registerTool(
     description:
       "Get details about a live team match including teams, players, and scores.",
     inputSchema: {
-      match_id: z
-        .number()
-        .int()
-        .describe("Live team match ID (numeric)"),
+      match_id: z.number().int().describe("Live team match ID (numeric)"),
     },
   },
   async ({ match_id }) => {
@@ -561,18 +489,10 @@ server.registerTool(
   "get_live_team_match_board",
   {
     title: "Get Live Team Match Board",
-    description:
-      "Get details about a specific board in a live team match.",
+    description: "Get details about a specific board in a live team match.",
     inputSchema: {
-      match_id: z
-        .number()
-        .int()
-        .describe("Live team match ID (numeric)"),
-      board: z
-        .number()
-        .int()
-        .min(1)
-        .describe("Board number"),
+      match_id: z.number().int().describe("Live team match ID (numeric)"),
+      board: z.number().int().min(1).describe("Board number"),
     },
   },
   async ({ match_id, board }) => {
@@ -615,13 +535,9 @@ server.registerTool(
   "get_country_players",
   {
     title: "Get Country Players",
-    description:
-      "Get a list of player usernames from a specific country.",
+    description: "Get a list of player usernames from a specific country.",
     inputSchema: {
-      iso_code: z
-        .string()
-        .length(2)
-        .describe("2-letter ISO 3166 country code"),
+      iso_code: z.string().length(2).describe("2-letter ISO 3166 country code"),
     },
   },
   async ({ iso_code }) => {
@@ -641,13 +557,9 @@ server.registerTool(
   "get_country_clubs",
   {
     title: "Get Country Clubs",
-    description:
-      "Get a list of club URLs from a specific country.",
+    description: "Get a list of club URLs from a specific country.",
     inputSchema: {
-      iso_code: z
-        .string()
-        .length(2)
-        .describe("2-letter ISO 3166 country code"),
+      iso_code: z.string().length(2).describe("2-letter ISO 3166 country code"),
     },
   },
   async ({ iso_code }) => {
@@ -717,8 +629,7 @@ server.registerTool(
   "get_streamers",
   {
     title: "Get Streamers",
-    description:
-      "Get a list of Chess.com streamers and their information.",
+    description: "Get a list of Chess.com streamers and their information.",
     inputSchema: {},
   },
   async () => {

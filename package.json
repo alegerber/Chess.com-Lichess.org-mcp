@@ -8,13 +8,20 @@
   },
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
   },
   "repository": {
     "type": "git",
     "url": "git+ssh://git@gitlab.com/devec/chess-com-mcp.git"
   },
-  "keywords": ["mcp", "chess", "chess.com", "model-context-protocol"],
+  "keywords": [
+    "mcp",
+    "chess",
+    "chess.com",
+    "model-context-protocol"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
@@ -27,7 +34,13 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^25.5.0",
-    "typescript": "^5.9.3"
+    "eslint": "^10.0.3",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.0"
   }
 }

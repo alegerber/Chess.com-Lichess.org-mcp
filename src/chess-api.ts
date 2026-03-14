@@ -1,6 +1,7 @@
 const BASE_URL = "https://api.chess.com/pub";
 
-const USER_AGENT = "chess-com-mcp/1.0.0 (MCP Server; https://github.com/chess-com-mcp)";
+const USER_AGENT =
+  "chess-com-mcp/1.0.0 (MCP Server; https://github.com/chess-com-mcp)";
 
 export class ChessComApiError extends Error {
   constructor(
@@ -61,7 +62,9 @@ export interface PlayerStats {
 }
 
 export function getPlayerStats(username: string): Promise<PlayerStats> {
-  return fetchApi(`/player/${encodeURIComponent(username.toLowerCase())}/stats`);
+  return fetchApi(
+    `/player/${encodeURIComponent(username.toLowerCase())}/stats`,
+  );
 }
 
 export interface PlayerOnlineStatus {
@@ -258,9 +261,7 @@ export function getTournamentRoundGroup(
   round: number,
   group: number,
 ): Promise<TournamentRoundGroup> {
-  return fetchApi(
-    `/tournament/${encodeURIComponent(urlId)}/${round}/${group}`,
-  );
+  return fetchApi(`/tournament/${encodeURIComponent(urlId)}/${round}/${group}`);
 }
 
 // ─── Team match endpoints ──────────────────────────────────────────
@@ -295,9 +296,7 @@ export interface CountryProfile {
   code: string;
 }
 
-export function getCountryProfile(
-  isoCode: string,
-): Promise<CountryProfile> {
+export function getCountryProfile(isoCode: string): Promise<CountryProfile> {
   return fetchApi(`/country/${encodeURIComponent(isoCode.toUpperCase())}`);
 }
 
@@ -305,9 +304,7 @@ export interface CountryPlayers {
   players: string[];
 }
 
-export function getCountryPlayers(
-  isoCode: string,
-): Promise<CountryPlayers> {
+export function getCountryPlayers(isoCode: string): Promise<CountryPlayers> {
   return fetchApi(
     `/country/${encodeURIComponent(isoCode.toUpperCase())}/players`,
   );
