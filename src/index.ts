@@ -7,7 +7,7 @@ import * as api from "./chess-api.js";
 import * as lichess from "./lichess-api.js";
 
 const server = new McpServer({
-  name: "chess-com-mcp",
+  name: "chess-com-lichess-org-mcp",
   version: "1.0.0",
 });
 

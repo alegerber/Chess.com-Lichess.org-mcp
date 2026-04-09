@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is an MCP (Model Context Protocol) server that exposes the Chess.com and Lichess public APIs as tools for LLMs. It communicates over stdio using JSON-RPC and is designed to run locally via Node.js or inside a Docker container.
+This is an MCP (Model Context Protocol) server that exposes the Chess.com and Lichess public APIs as tools for LLMs. It communicates over stdio using JSON-RPC and is designed to run locally via Node.js.
 
 ## Architecture
 
@@ -21,12 +21,11 @@ There is no database, no authentication, and no state between requests. Every to
 
 ## Tech Stack
 
-- **Runtime**: Node.js 22 (Alpine in Docker)
+- **Runtime**: Node.js 22
 - **Language**: TypeScript (strict mode, ES2022 target, Node16 module resolution)
 - **MCP SDK**: `@modelcontextprotocol/sdk` v1.x (`McpServer` + `StdioServerTransport`)
 - **Validation**: Zod v4 (used for tool input schemas)
 - **Linting**: ESLint v10 flat config + typescript-eslint + Prettier integration
-- **Docker**: Multi-stage build (build stage compiles TS, runtime stage has only production deps + compiled JS)
 
 ## Key Commands
 
@@ -36,9 +35,6 @@ npm run build        # Compile TypeScript to dist/
 npm run lint         # Check for lint errors
 npm run lint:fix     # Auto-fix lint/formatting issues
 npm start            # Run the MCP server locally (stdio)
-
-docker compose build              # Build Docker image
-docker compose run --rm -T chess-com-mcp   # Run via Docker Compose
 ```
 
 ## Adding a New Tool
@@ -100,19 +96,13 @@ There are no unit tests. Verification is done by:
 
 1. `npm run lint` — zero errors
 2. `npm run build` — clean compilation
-3. Manual MCP protocol test via Docker:
+3. Manual MCP protocol test:
    ```bash
    echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' \
-     | docker run --rm -i chess-com-mcp:latest
+     | node dist/index.js
    ```
-   Expected: JSON response with `serverInfo.name` = `"chess-com-mcp"` and `capabilities.tools`
-
-## Docker
-
-- **Dockerfile**: Two-stage build. Stage 1 (`build`) installs all deps and compiles. Stage 2 copies only `dist/` and production `node_modules/`.
-- **docker-compose.yml**: Single service with `stdin_open: true` (required for stdio MCP transport).
-- **`.dockerignore`**: Excludes `node_modules/`, `dist/`, `.git/`, `README.md`, `docker-compose.yml`.
+   Expected: JSON response with `serverInfo.name` = `"chess-com-lichess-org-mcp"` and `capabilities.tools`
 
 ## Claude Desktop Integration
 
-The server is configured in `~/Library/Application Support/Claude/claude_desktop_config.json` under the `chess-com` MCP server entry, running via Docker.
+The server is configured in `~/Library/Application Support/Claude/claude_desktop_config.json` under the `chess-com` MCP server entry, running via Node.js.
