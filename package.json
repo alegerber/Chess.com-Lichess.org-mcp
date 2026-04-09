@@ -10,7 +10,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint:fix": "eslint src/ --fix",
+    "dev": "tsc --watch"
   },
   "repository": {
     "type": "git",
