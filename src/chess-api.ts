@@ -1,7 +1,7 @@
 const BASE_URL = "https://api.chess.com/pub";
 
 const USER_AGENT =
-  "chess-com-mcp/1.0.0 (MCP Server; https://github.com/chess-com-mcp)";
+  "chess-com-lichess-org-mcp/1.0.0 (MCP Server; https://github.com/chess-com-lichess-org-mcp)";
 
 export class ChessComApiError extends Error {
   constructor(

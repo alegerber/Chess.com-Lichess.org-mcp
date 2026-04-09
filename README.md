@@ -1,4 +1,4 @@
-# chess-com-mcp
+# chess-com-lichess-org-mcp
 
 An MCP (Model Context Protocol) server that provides access to the [Chess.com Published-Data API](https://www.chess.com/news/view/published-data-api) and the [Lichess API](https://lichess.org/api). This gives LLMs the ability to look up player profiles, game history, stats, clubs, tournaments, puzzles, leaderboards, and more from both platforms.
 
@@ -68,78 +68,30 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 
 ## Setup
 
-### Option 1: Local (Node.js)
-
 ```bash
 npm install
 npm run build
 ```
 
-#### Configure in Claude Desktop
+### Configure in Claude Desktop
 
 Add the following to your Claude Desktop MCP configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
 ```json
 {
   "mcpServers": {
-    "chess-com": {
+    "chess-mcp": {
       "command": "node",
-      "args": ["/absolute/path/to/chess-com-mcp/dist/index.js"]
+      "args": ["/absolute/path/to/chess-com-lichess-org-mcp/dist/index.js"]
     }
   }
 }
 ```
 
-#### Configure in Claude Code
+### Configure in Claude Code
 
 ```bash
-claude mcp add chess-com node /absolute/path/to/chess-com-mcp/dist/index.js
-```
-
-### Option 2: Docker
-
-#### Build the image
-
-```bash
-docker build -t chess-com-mcp .
-```
-
-Or using Docker Compose:
-
-```bash
-docker compose build
-```
-
-#### Configure in Claude Desktop (Docker)
-
-```json
-{
-  "mcpServers": {
-    "chess-com": {
-      "command": "docker",
-      "args": ["run", "--rm", "-i", "chess-com-mcp:latest"]
-    }
-  }
-}
-```
-
-#### Configure in Claude Code (Docker)
-
-```bash
-claude mcp add chess-com docker run --rm -i chess-com-mcp:latest
-```
-
-#### Configure in Claude Desktop (Docker Compose)
-
-```json
-{
-  "mcpServers": {
-    "chess-com": {
-      "command": "docker",
-      "args": ["compose", "-f", "/absolute/path/to/chess-com-mcp/docker-compose.yml", "run", "--rm", "-T", "chess-com-mcp"]
-    }
-  }
-}
+claude mcp add chess-mcp node /absolute/path/to/chess-com-lichess-org-mcp/dist/index.js
 ```
 
 ## Usage examples

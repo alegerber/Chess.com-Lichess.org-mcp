@@ -1,10 +1,10 @@
 {
-  "name": "chess-com-mcp",
+  "name": "chess-com-lichess-org-mcp",
   "version": "1.0.0",
   "description": "MCP server for the Chess.com public API",
   "main": "dist/index.js",
   "bin": {
-    "chess-com-mcp": "dist/index.js"
+    "chess-com-lichess-org-mcp": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -14,7 +14,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@gitlab.com/devec/chess-com-mcp.git"
+    "url": "git+ssh://git@gitlab.com/devec/chess-com-lichess-org-mcp.git"
   },
   "keywords": [
     "mcp",
@@ -26,9 +26,9 @@
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://gitlab.com/devec/chess-com-mcp/issues"
+    "url": "https://gitlab.com/devec/chess-com-lichess-org-mcp/issues"
   },
-  "homepage": "https://gitlab.com/devec/chess-com-mcp#readme",
+  "homepage": "https://gitlab.com/devec/chess-com-lichess-org-mcp#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "zod": "^4.3.6"
