@@ -291,6 +291,8 @@ export function searchTeams(text: string, page: number = 1): Promise<unknown> {
   );
 }
 
+// Currently unused: /api/team/of is OAuth-only, so the tool returns a clear
+// message instead of calling this (#31). Wired back up with token support (#30).
 export function getUserTeams(username: string): Promise<unknown[]> {
   return fetchJson(`/api/team/of/${encodeURIComponent(username)}`);
 }

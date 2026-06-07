@@ -12,6 +12,15 @@ import {
 // All tools are read-only and talk to an external API.
 const READ_ONLY_HINTS = { readOnlyHint: true, openWorldHint: true };
 
+// Lichess made GET /api/team/of OAuth-only (security: - OAuth2: []), so this
+// auth-less server can never satisfy it. Until optional token support lands
+// (#30) we return this clear message instead of a guaranteed-401 request (#31).
+const USER_TEAMS_AUTH_MESSAGE =
+  "lichess_get_user_teams is unavailable: Lichess requires an OAuth token for " +
+  "/api/team/of, and this server runs without authentication. Token support is " +
+  "planned for a future major release. For related public data, try " +
+  "lichess_search_teams or lichess_get_team_members.";
+
 // ─── Formatters ────────────────────────────────────────────────────
 
 export function formatUser(u: lichess.LichessUser): string {
@@ -440,12 +449,18 @@ export function registerLichessTools(server: McpServer): void {
     {
       annotations: READ_ONLY_HINTS,
       title: "Lichess: User's Teams",
-      description: "Get all teams a Lichess user is a member of.",
+      description:
+        "Get all teams a Lichess user is a member of. Requires a Lichess OAuth " +
+        "token — the /api/team/of endpoint is no longer public, and this " +
+        "read-only server sends none, so the tool returns an explanatory " +
+        "error. For related public data use lichess_search_teams or " +
+        "lichess_get_team_members.",
       inputSchema: {
         username: z.string().describe("Lichess username"),
       },
     },
-    ({ username }) => call(() => lichess.getUserTeams(username), jsonBlock),
+    // No request: the endpoint always 401s without a token (#31). Real fix: #30.
+    () => text(USER_TEAMS_AUTH_MESSAGE, true),
   );
 
   server.registerTool(
