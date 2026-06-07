@@ -9,6 +9,9 @@ import {
   errorResult,
 } from "../format.js";
 
+// All tools are read-only and talk to an external API.
+const READ_ONLY_HINTS = { readOnlyHint: true, openWorldHint: true };
+
 // ─── Formatters ────────────────────────────────────────────────────
 
 export function formatUser(u: lichess.LichessUser): string {
@@ -78,6 +81,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_user",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Get User",
       description:
         "Get a Lichess user's profile including ratings across all variants, game counts, play time, and bio.",
@@ -91,6 +95,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_user_status",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: User Online Status",
       description:
         "Check if one or more Lichess users are online, playing, or streaming. Accepts up to 100 usernames.",
@@ -123,6 +128,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_rating_history",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Rating History",
       description:
         "Get the rating history of a Lichess user across all variants. Returns daily data points.",
@@ -152,6 +158,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_perf_stats",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Performance Stats",
       description:
         "Get detailed performance statistics for a Lichess user in a specific variant/speed. Includes best wins, worst losses, streaks, and rating distribution.",
@@ -184,6 +191,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_user_activity",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: User Activity",
       description:
         "Get recent activity of a Lichess user: games played, tournaments, practice, etc.",
@@ -199,6 +207,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_user_games",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Get User Games",
       description:
         "Get recent games of a Lichess user. Returns up to the specified max number of games with optional filters.",
@@ -222,9 +231,23 @@ export function registerLichessTools(server: McpServer): void {
           .enum(["white", "black"])
           .optional()
           .describe("Filter by color played"),
+        since: z
+          .number()
+          .int()
+          .optional()
+          .describe("Only games played at or after this time (Unix ms)"),
+        until: z
+          .number()
+          .int()
+          .optional()
+          .describe("Only games played at or before this time (Unix ms)"),
+        opening: z
+          .boolean()
+          .optional()
+          .describe("Include opening information (default true)"),
       },
     },
-    ({ username, max, rated, perfType, color }) =>
+    ({ username, max, rated, perfType, color, since, until, opening }) =>
       call(
         () =>
           lichess.getUserGames(username, {
@@ -232,7 +255,9 @@ export function registerLichessTools(server: McpServer): void {
             rated,
             perfType,
             color,
-            opening: true,
+            since,
+            until,
+            opening: opening ?? true,
           }),
         (games) =>
           games.length === 0
@@ -244,6 +269,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_game",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Get Game by ID",
       description:
         "Get a specific Lichess game by its 8-character game ID. Returns full game data including moves, clocks, and analysis.",
@@ -257,6 +283,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_current_game",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Current Game",
       description:
         "Get the current ongoing game of a Lichess user, or their last played game if not currently playing.",
@@ -272,6 +299,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_leaderboards",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: All Leaderboards",
       description:
         "Get the top 10 players across all Lichess variants and speeds (bullet, blitz, rapid, classical, etc).",
@@ -283,6 +311,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_leaderboard",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Leaderboard by Variant",
       description:
         "Get the top N players for a specific Lichess variant/speed.",
@@ -321,6 +350,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_daily_puzzle",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Daily Puzzle",
       description:
         "Get today's daily puzzle from Lichess, including the position, solution, rating, and themes.",
@@ -332,6 +362,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_puzzle",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Get Puzzle by ID",
       description:
         "Get a specific Lichess puzzle by its ID. Returns the position, solution, rating, and themes.",
@@ -346,6 +377,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_storm_dashboard",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Puzzle Storm Dashboard",
       description: "Get the Puzzle Storm statistics for a Lichess user.",
       inputSchema: {
@@ -361,6 +393,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_team",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Get Team",
       description:
         "Get a Lichess team's profile including name, description, leader, and member count.",
@@ -385,6 +418,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_search_teams",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Search Teams",
       description: "Search for Lichess teams by name.",
       inputSchema: {
@@ -404,6 +438,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_user_teams",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: User's Teams",
       description: "Get all teams a Lichess user is a member of.",
       inputSchema: {
@@ -416,6 +451,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_team_members",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Team Members",
       description: "Get members of a Lichess team.",
       inputSchema: {
@@ -434,6 +470,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_current_tournaments",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Current Tournaments",
       description:
         "Get the current tournament schedule on Lichess: created, started, and finished tournaments.",
@@ -445,6 +482,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_tournament",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Get Tournament",
       description:
         "Get details about a specific Lichess arena tournament, including standings.",
@@ -466,6 +504,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_user_tournaments",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: User's Tournaments",
       description: "Get tournaments a Lichess user has played in.",
       inputSchema: {
@@ -487,6 +526,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_tv_channels",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: TV Channels",
       description:
         "Get the current featured game on each Lichess TV channel (best game per variant/speed).",
@@ -498,6 +538,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_tv_games",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: TV Channel Games",
       description:
         "Get the best ongoing games from a specific Lichess TV channel.",
@@ -540,6 +581,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_streamers",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Live Streamers",
       description:
         "Get currently live Lichess streamers on Twitch and YouTube.",
@@ -560,6 +602,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_crosstable",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Head-to-Head",
       description:
         "Get the head-to-head record between two Lichess users: total games and score.",
@@ -593,6 +636,7 @@ export function registerLichessTools(server: McpServer): void {
   server.registerTool(
     "lichess_get_cloud_eval",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Lichess: Cloud Evaluation",
       description:
         "Get the cloud engine evaluation for a FEN position from Lichess's analysis database.",

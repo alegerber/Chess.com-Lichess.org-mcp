@@ -169,3 +169,24 @@ test("lichess_get_team_members returns a bounded result for a large team", { ski
     `expected a bounded result, got ${text.length} chars`,
   );
 });
+
+// ─── API completeness (#17) ────────────────────────────────────────
+
+test("UAT 5.1 lichess_get_user_games honours max/since filters", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_user_games", {
+    username: "DrNykterstein",
+    max: 2,
+    since: 1356998400000, // 2013-01-01
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Found \d+ games|No games found/);
+});
+
+test("UAT 5.4 lichess_get_crosstable returns a head-to-head record", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_crosstable", {
+    user1: "DrNykterstein",
+    user2: "penguingim1",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Total games:/);
+});
