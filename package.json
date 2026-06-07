@@ -6,6 +6,7 @@
   "bin": {
     "chess-com-lichess-org-mcp": "dist/index.js"
   },
+  "files": ["dist"],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
@@ -17,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@gitlab.com/devec/chess-com-lichess-org-mcp.git"
+    "url": "git+https://github.com/alegerber/chess-com-lichess-org-mcp.git"
   },
   "keywords": [
     "mcp",
@@ -30,10 +31,13 @@
   "author": "Alexander Gerber <alex.gerber90@gmail.com>",
   "license": "MIT",
   "type": "commonjs",
-  "bugs": {
-    "url": "https://gitlab.com/devec/chess-com-lichess-org-mcp/issues"
+  "engines": {
+    "node": ">=18"
   },
-  "homepage": "https://gitlab.com/devec/chess-com-lichess-org-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/alegerber/chess-com-lichess-org-mcp/issues"
+  },
+  "homepage": "https://github.com/alegerber/chess-com-lichess-org-mcp#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "zod": "^4.3.6"

@@ -1,7 +1,8 @@
+import { VERSION } from "./version.js";
+
 const BASE_URL = "https://api.chess.com/pub";
 
-const USER_AGENT =
-  "chess-com-lichess-org-mcp/1.0.0 (MCP Server; https://github.com/chess-com-lichess-org-mcp)";
+const USER_AGENT = `chess-com-lichess-org-mcp/${VERSION} (MCP Server; https://github.com/alegerber/chess-com-lichess-org-mcp)`;
 
 const JSON_TIMEOUT_MS = 10_000;
 
