@@ -63,3 +63,23 @@ test("errorResult maps a JSON parse error to an invalid-response result", () => 
   assert.equal(r.isError, true);
   assert.match(r.content[0].text, /invalid response/i);
 });
+
+test("errorResult maps a request timeout to a tagged 'timed out' result", () => {
+  const e = new DOMException("The operation timed out", "TimeoutError");
+  const r = format.errorResult("Lichess", e);
+  assert.equal(r.isError, true);
+  assert.match(r.content[0].text, /Lichess request timed out/);
+});
+
+// ─── jsonBlock size backstop (M6) ──────────────────────────────────
+
+test("jsonBlock returns full JSON below the size cap", () => {
+  const r = format.jsonBlock({ a: 1, b: "x" });
+  assert.equal(r, JSON.stringify({ a: 1, b: "x" }, null, 2));
+});
+
+test("jsonBlock caps very large output with a truncation marker", () => {
+  const r = format.jsonBlock({ blob: "x".repeat(200_000) });
+  assert.ok(r.length < 200_000, "output should be capped well below input size");
+  assert.match(r, /truncated/);
+});

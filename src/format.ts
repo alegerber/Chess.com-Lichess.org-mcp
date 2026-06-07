@@ -1,5 +1,13 @@
+const JSON_BLOCK_MAX_CHARS = 50_000;
+
 export function jsonBlock(data: unknown): string {
-  return JSON.stringify(data, null, 2);
+  const serialized = JSON.stringify(data, null, 2);
+  if (serialized.length <= JSON_BLOCK_MAX_CHARS) return serialized;
+  // Last-resort backstop so a single tool call can never blow the context window.
+  return (
+    serialized.slice(0, JSON_BLOCK_MAX_CHARS) +
+    `\n… truncated (${serialized.length - JSON_BLOCK_MAX_CHARS} more characters not shown)`
+  );
 }
 
 /**
@@ -54,6 +62,12 @@ export function errorResult(service: string, e: unknown) {
   }
   if (e instanceof SyntaxError) {
     return text(`${service} returned an invalid response: ${e.message}`, true);
+  }
+  if (
+    e instanceof Error &&
+    (e.name === "TimeoutError" || e.name === "AbortError")
+  ) {
+    return text(`${service} request timed out`, true);
   }
   if (e instanceof Error && (e as { cause?: unknown }).cause != null) {
     return text(
