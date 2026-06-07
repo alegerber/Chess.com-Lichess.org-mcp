@@ -13,6 +13,9 @@ export class LichessApiError extends Error {
   }
 }
 
+const JSON_TIMEOUT_MS = 10_000;
+const STREAM_TIMEOUT_MS = 30_000;
+
 async function fetchJson<T>(path: string): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const response = await fetch(url, {
@@ -20,6 +23,7 @@ async function fetchJson<T>(path: string): Promise<T> {
       "User-Agent": USER_AGENT,
       Accept: "application/json",
     },
+    signal: AbortSignal.timeout(JSON_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -32,13 +36,39 @@ async function fetchJson<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function fetchNdjson<T>(path: string): Promise<T[]> {
+/**
+ * Parse NDJSON text into an array. CRLF-safe, skips blank and malformed lines
+ * (so one truncated record never discards the whole result), and stops at
+ * maxLines when provided.
+ */
+export function parseNdjson<T>(text: string, maxLines?: number): T[] {
+  const out: T[] = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    try {
+      out.push(JSON.parse(line) as T);
+    } catch {
+      continue;
+    }
+    if (maxLines !== undefined && out.length >= maxLines) break;
+  }
+  return out;
+}
+
+/**
+ * Stream an NDJSON endpoint. When maxLines is set, stop reading (and abort the
+ * request) once that many lines have arrived, so unbounded endpoints (e.g. team
+ * members) cannot buffer hundreds of MB into memory.
+ */
+async function fetchNdjson<T>(path: string, maxLines?: number): Promise<T[]> {
   const url = `${BASE_URL}${path}`;
   const response = await fetch(url, {
     headers: {
       "User-Agent": USER_AGENT,
       Accept: "application/x-ndjson",
     },
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -48,12 +78,26 @@ async function fetchNdjson<T>(path: string): Promise<T[]> {
     );
   }
 
-  const text = await response.text();
-  return text
-    .trim()
-    .split("\n")
-    .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as T);
+  // Unbounded callers are already limited by API params (max/nb) — read directly.
+  if (maxLines === undefined || !response.body) {
+    return parseNdjson<T>(await response.text());
+  }
+
+  // Bounded caller: read incrementally and stop once we have enough lines.
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    if (buffer.split("\n").length - 1 >= maxLines) {
+      await reader.cancel();
+      break;
+    }
+  }
+  buffer += decoder.decode();
+  return parseNdjson<T>(buffer, maxLines);
 }
 
 // ─── User endpoints ────────────────────────────────────────────────
@@ -250,8 +294,15 @@ export function getUserTeams(username: string): Promise<unknown[]> {
   return fetchJson(`/api/team/of/${encodeURIComponent(username)}`);
 }
 
+// Memory safety net: large teams have hundreds of thousands of members and the
+// endpoint has no server-side limit, so cap the stream well above the display cap.
+const TEAM_MEMBERS_MAX = 200;
+
 export function getTeamMembers(teamId: string): Promise<unknown[]> {
-  return fetchNdjson(`/api/team/${encodeURIComponent(teamId)}/users`);
+  return fetchNdjson(
+    `/api/team/${encodeURIComponent(teamId)}/users`,
+    TEAM_MEMBERS_MAX,
+  );
 }
 
 // ─── Tournaments ───────────────────────────────────────────────────
@@ -264,9 +315,12 @@ export function getTournament(id: string, page: number = 1): Promise<unknown> {
   return fetchJson(`/api/tournament/${encodeURIComponent(id)}?page=${page}`);
 }
 
+const USER_TOURNAMENTS_MAX = 100;
+
 export function getUserTournaments(username: string): Promise<unknown[]> {
   return fetchNdjson(
     `/api/user/${encodeURIComponent(username)}/tournament/played`,
+    USER_TOURNAMENTS_MAX,
   );
 }
 

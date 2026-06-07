@@ -3,6 +3,8 @@ const BASE_URL = "https://api.chess.com/pub";
 const USER_AGENT =
   "chess-com-lichess-org-mcp/1.0.0 (MCP Server; https://github.com/chess-com-lichess-org-mcp)";
 
+const JSON_TIMEOUT_MS = 10_000;
+
 export class ChessComApiError extends Error {
   constructor(
     public status: number,
@@ -20,6 +22,7 @@ async function fetchApi<T>(path: string): Promise<T> {
       "User-Agent": USER_AGENT,
       Accept: "application/json",
     },
+    signal: AbortSignal.timeout(JSON_TIMEOUT_MS),
   });
 
   if (!response.ok) {

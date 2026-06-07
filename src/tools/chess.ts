@@ -343,12 +343,20 @@ export function registerChessTools(server: McpServer): void {
       call(
         () => api.getClubMembers(url_id),
         (d) => {
+          const cap = 50;
           const summary = [
             `Weekly active: ${d.weekly.length}`,
             `Monthly active: ${d.monthly.length}`,
             `All-time: ${d.all_time.length}`,
           ].join("\n");
-          return `${summary}\n\n${jsonBlock(d)}`;
+          // Show only a slice of each group — a large club's all_time list can be
+          // tens of thousands of members; totals are already in the summary.
+          const slim = {
+            weekly: d.weekly.slice(0, cap),
+            monthly: d.monthly.slice(0, cap),
+            all_time: d.all_time.slice(0, cap),
+          };
+          return `${summary}\n\n${jsonBlock(slim)}`;
         },
       ),
   );
