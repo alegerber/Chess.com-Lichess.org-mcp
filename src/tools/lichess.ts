@@ -1,21 +1,30 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as lichess from "../lichess-api.js";
-import { jsonBlock, toISOString, truncated, text } from "../format.js";
+import {
+  jsonBlock,
+  toISOString,
+  truncated,
+  text,
+  errorResult,
+} from "../format.js";
 
 // ─── Formatters ────────────────────────────────────────────────────
 
-function formatUser(u: lichess.LichessUser): string {
-  const lines: string[] = [`Username: ${u.username}`, `URL: ${u.url}`];
+export function formatUser(u: lichess.LichessUser): string {
+  const lines: string[] = [`Username: ${u.username}`];
+  if (u.url) lines.push(`URL: ${u.url}`);
   if (u.title) lines.push(`Title: ${u.title}`);
   if (u.profile?.firstName || u.profile?.lastName)
     lines.push(
       `Name: ${[u.profile.firstName, u.profile.lastName].filter(Boolean).join(" ")}`,
     );
   if (u.patron) lines.push(`Patron: yes`);
-  lines.push(
-    `Games: ${u.count.all} (W: ${u.count.win} / L: ${u.count.loss} / D: ${u.count.draw})`,
-  );
+  // Closed/disabled accounts return HTTP 200 without count/perfs — guard both.
+  if (u.count)
+    lines.push(
+      `Games: ${u.count.all} (W: ${u.count.win} / L: ${u.count.loss} / D: ${u.count.draw})`,
+    );
   if (u.playTime)
     lines.push(
       `Play time: ${Math.round(u.playTime.total / 3600)}h total, ${Math.round(u.playTime.tv / 3600)}h on TV`,
@@ -26,7 +35,7 @@ function formatUser(u: lichess.LichessUser): string {
   if (u.profile?.bio) lines.push(`Bio: ${u.profile.bio}`);
 
   const perfLines: string[] = [];
-  for (const [key, val] of Object.entries(u.perfs)) {
+  for (const [key, val] of Object.entries(u.perfs ?? {})) {
     perfLines.push(
       `  ${key}: ${val.rating}${val.prov ? "?" : ""} (${val.games} games, ${val.prog >= 0 ? "+" : ""}${val.prog})`,
     );
@@ -50,14 +59,14 @@ function formatPuzzle(data: lichess.LichessPuzzle): string {
 
 // ─── Error handler ─────────────────────────────────────────────────
 
-async function call<T>(fn: () => Promise<T>, format: (d: T) => string) {
+export async function call<T>(fn: () => Promise<T>, format: (d: T) => string) {
   try {
     return text(format(await fn()));
   } catch (e) {
-    if (e instanceof lichess.LichessApiError) {
-      return text(`Lichess error (${e.status}): ${e.message}`);
-    }
-    throw e;
+    // Catch every failure mode — typed API errors, network failures (TypeError
+    // with cause), and invalid response bodies (SyntaxError) — and surface it as
+    // a tagged tool error instead of an opaque, context-free throw.
+    return errorResult("Lichess", e);
   }
 }
 

@@ -1,11 +1,17 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as api from "../chess-api.js";
-import { jsonBlock, toISOString, truncated, text } from "../format.js";
+import {
+  jsonBlock,
+  toISOString,
+  truncated,
+  text,
+  errorResult,
+} from "../format.js";
 
 // ─── Formatters ────────────────────────────────────────────────────
 
-function formatProfile(p: api.PlayerProfile): string {
+export function formatProfile(p: api.PlayerProfile): string {
   const lines: string[] = [`Username: ${p.username}`, `URL: ${p.url}`];
   if (p.title) lines.push(`Title: ${p.title}`);
   if (p.name) lines.push(`Name: ${p.name}`);
@@ -32,14 +38,14 @@ function formatPuzzle(data: api.DailyPuzzle): string {
 
 // ─── Error handler ─────────────────────────────────────────────────
 
-async function call<T>(fn: () => Promise<T>, format: (d: T) => string) {
+export async function call<T>(fn: () => Promise<T>, format: (d: T) => string) {
   try {
     return text(format(await fn()));
   } catch (e) {
-    if (e instanceof api.ChessComApiError) {
-      return text(`Chess.com error (${e.status}): ${e.message}`);
-    }
-    throw e;
+    // Catch every failure mode — typed API errors, network failures (TypeError
+    // with cause), and invalid response bodies (SyntaxError) — and surface it as
+    // a tagged tool error instead of an opaque, context-free throw.
+    return errorResult("Chess.com", e);
   }
 }
 
