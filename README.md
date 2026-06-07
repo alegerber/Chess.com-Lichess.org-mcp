@@ -67,33 +67,39 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `lichess_get_crosstable` | Get head-to-head record between two users |
 | `lichess_get_cloud_eval` | Get cloud engine evaluation for a FEN position |
 
-## Setup
+## Install
+
+No clone or build required — run the published package with `npx`.
+
+### Claude Code
+
+```bash
+claude mcp add chess-mcp -- npx -y chess-com-lichess-org-mcp
+```
+
+### Claude Desktop
+
+Add the following to your config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "chess-mcp": {
+      "command": "npx",
+      "args": ["-y", "chess-com-lichess-org-mcp"]
+    }
+  }
+}
+```
+
+### From source (development)
 
 ```bash
 npm install
 npm run build
 ```
 
-### Configure in Claude Desktop
-
-Add the following to your Claude Desktop MCP configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
-
-```json
-{
-  "mcpServers": {
-    "chess-mcp": {
-      "command": "node",
-      "args": ["/absolute/path/to/chess-com-lichess-org-mcp/dist/index.js"]
-    }
-  }
-}
-```
-
-### Configure in Claude Code
-
-```bash
-claude mcp add chess-mcp node /absolute/path/to/chess-com-lichess-org-mcp/dist/index.js
-```
+Then point the MCP config at the built entry point — `command: node`, `args: ["/absolute/path/to/chess-com-lichess-org-mcp/dist/index.js"]`.
 
 ## Usage examples
 
