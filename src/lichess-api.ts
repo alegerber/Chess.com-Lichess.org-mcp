@@ -356,8 +356,9 @@ export function getCrosstable(
   user1: string,
   user2: string,
 ): Promise<Crosstable> {
+  // matchup=1 includes the current head-to-head match (the formatter renders it).
   return fetchJson(
-    `/api/crosstable/${encodeURIComponent(user1)}/${encodeURIComponent(user2)}`,
+    `/api/crosstable/${encodeURIComponent(user1)}/${encodeURIComponent(user2)}?matchup=1`,
   );
 }
 

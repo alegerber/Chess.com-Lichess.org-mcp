@@ -9,6 +9,9 @@ import {
   errorResult,
 } from "../format.js";
 
+// All tools are read-only and talk to an external API.
+const READ_ONLY_HINTS = { readOnlyHint: true, openWorldHint: true };
+
 // ─── Formatters ────────────────────────────────────────────────────
 
 export function formatProfile(p: api.PlayerProfile): string {
@@ -79,6 +82,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_player_profile",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Player Profile",
       description:
         "Get a Chess.com player's profile information including username, title, status, FIDE rating, join date, and more.",
@@ -92,6 +96,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_player_stats",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Player Stats",
       description:
         "Get a Chess.com player's ratings, win/loss/draw records, and other statistics across all game types (daily, rapid, blitz, bullet, tactics, puzzle rush, etc).",
@@ -105,6 +110,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "is_player_online",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Is Player Online",
       description:
         "Check if a Chess.com player has been online in the last 5 minutes.",
@@ -124,6 +130,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_current_daily_games",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Current Daily Games",
       description: "Get the daily chess games a player is currently playing.",
       inputSchema: {
@@ -143,6 +150,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_games_to_move",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Games To Move",
       description:
         "Get daily chess games where it is the player's turn to move.",
@@ -163,6 +171,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_game_archives",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Game Archives",
       description:
         "Get a list of monthly archive URLs available for a player. Each URL can be used to fetch the games for that month.",
@@ -183,6 +192,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_monthly_archives",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Monthly Game Archive",
       description:
         "Get all games a player played in a specific month. Returns full game data including PGN, results, and ratings.",
@@ -214,6 +224,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_player_clubs",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Player Clubs",
       description: "Get the list of clubs a player is a member of.",
       inputSchema: {
@@ -230,6 +241,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_player_tournaments",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Player Tournaments",
       description:
         "Get tournaments a player has participated in, is currently in, or is registered for.",
@@ -254,6 +266,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_player_matches",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Player Team Matches",
       description:
         "Get team matches a player has participated in, is currently in, or is registered for.",
@@ -269,6 +282,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_titled_players",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Titled Players",
       description:
         "Get a list of usernames of players who hold a specific chess title. Valid titles: GM, WGM, IM, WIM, FM, WFM, NM, WNM, CM, WCM.",
@@ -302,6 +316,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_club_profile",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Club Profile",
       description:
         "Get a Chess.com club's profile information. The url-ID is the slug from the club's web page URL.",
@@ -332,6 +347,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_club_members",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Club Members",
       description:
         "Get a club's members grouped by activity level (weekly, monthly, all-time).",
@@ -364,6 +380,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_club_matches",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Club Matches",
       description:
         "Get a club's team matches grouped by status (finished, in progress, registered).",
@@ -379,6 +396,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_tournament",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Tournament",
       description:
         "Get details about a Chess.com tournament including settings, players, and round URLs.",
@@ -396,6 +414,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_tournament_round",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Tournament Round",
       description:
         "Get details about a specific round of a tournament, including groups and players.",
@@ -411,6 +430,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_tournament_round_group",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Tournament Round Group",
       description:
         "Get details about a specific group within a tournament round, including games and standings.",
@@ -429,6 +449,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_team_match",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Team Match",
       description:
         "Get details about a daily team match including teams, players, and scores.",
@@ -442,6 +463,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_team_match_board",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Team Match Board",
       description: "Get details about a specific board in a daily team match.",
       inputSchema: {
@@ -456,6 +478,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_live_team_match",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Live Team Match",
       description:
         "Get details about a live team match including teams, players, and scores.",
@@ -469,6 +492,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_live_team_match_board",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Live Team Match Board",
       description: "Get details about a specific board in a live team match.",
       inputSchema: {
@@ -485,6 +509,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_country_profile",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Country Profile",
       description:
         "Get profile information for a country on Chess.com using its 2-letter ISO 3166 code.",
@@ -505,6 +530,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_country_players",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Country Players",
       description: "Get a list of player usernames from a specific country.",
       inputSchema: {
@@ -531,6 +557,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_country_clubs",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Country Clubs",
       description: "Get a list of club URLs from a specific country.",
       inputSchema: {
@@ -559,6 +586,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_daily_puzzle",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Daily Puzzle",
       description:
         "Get today's daily chess puzzle from Chess.com, including the FEN position and PGN solution.",
@@ -570,6 +598,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_random_puzzle",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Random Puzzle",
       description:
         "Get a random daily chess puzzle from Chess.com, including the FEN position and PGN solution.",
@@ -583,6 +612,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_streamers",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Streamers",
       description: "Get a list of Chess.com streamers and their information.",
       inputSchema: {},
@@ -599,6 +629,7 @@ export function registerChessTools(server: McpServer): void {
   server.registerTool(
     "get_leaderboards",
     {
+      annotations: READ_ONLY_HINTS,
       title: "Get Leaderboards",
       description:
         "Get Chess.com leaderboards for all game types (daily, rapid, blitz, bullet, etc.), tactics, and puzzle rush.",

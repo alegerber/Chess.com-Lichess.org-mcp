@@ -1,18 +1,9 @@
 #!/usr/bin/env node
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { registerChessTools } from "./tools/chess.js";
-import { registerLichessTools } from "./tools/lichess.js";
-import { VERSION } from "./version.js";
+import { createServer } from "./server.js";
 
-const server = new McpServer({
-  name: "chess-com-lichess-org-mcp",
-  version: VERSION,
-});
-
-registerChessTools(server);
-registerLichessTools(server);
+const server = createServer();
 
 async function main() {
   const transport = new StdioServerTransport();
