@@ -36,6 +36,28 @@ function formatPuzzle(data: api.DailyPuzzle): string {
   ].join("\n");
 }
 
+const ONLINE_WINDOW_SECONDS = 300;
+
+/**
+ * Chess.com has no is-online endpoint; derive recency from the profile's
+ * last_online (Unix seconds). Online = seen within the last 5 minutes.
+ * `nowMs` is injectable for deterministic testing.
+ */
+export function formatOnlineStatus(
+  username: string,
+  lastOnline: number,
+  nowMs: number = Date.now(),
+): string {
+  const online =
+    Number.isFinite(lastOnline) &&
+    nowMs / 1000 - lastOnline < ONLINE_WINDOW_SECONDS;
+  if (online) return `${username} is online`;
+  const seen = toISOString(lastOnline, "s");
+  return seen === "unknown"
+    ? `${username} is offline`
+    : `${username} is offline (last online ${seen})`;
+}
+
 // ─── Error handler ─────────────────────────────────────────────────
 
 export async function call<T>(fn: () => Promise<T>, format: (d: T) => string) {
@@ -92,8 +114,8 @@ export function registerChessTools(server: McpServer): void {
     },
     ({ username }) =>
       call(
-        () => api.getPlayerOnlineStatus(username),
-        (s) => `${username} is ${s.online ? "online" : "offline"}`,
+        () => api.getPlayerProfile(username),
+        (p) => formatOnlineStatus(username, p.last_online),
       ),
   );
 

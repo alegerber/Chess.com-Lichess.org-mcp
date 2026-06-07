@@ -67,18 +67,6 @@ export function getPlayerStats(username: string): Promise<PlayerStats> {
   );
 }
 
-export interface PlayerOnlineStatus {
-  online: boolean;
-}
-
-export function getPlayerOnlineStatus(
-  username: string,
-): Promise<PlayerOnlineStatus> {
-  return fetchApi(
-    `/player/${encodeURIComponent(username.toLowerCase())}/is-online`,
-  );
-}
-
 // ─── Player games endpoints ────────────────────────────────────────
 
 export interface CurrentDailyGames {
