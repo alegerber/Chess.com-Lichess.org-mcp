@@ -36,3 +36,33 @@ test("server exposes instructions (L4)", async () => {
   assert.match(instructions, /lichess_|read-only/i);
   await client.close();
 });
+
+// Lichess made GET /api/team/of OAuth-only (security: - OAuth2: []), so this
+// auth-less server can never satisfy it. Interim: flag the requirement in the
+// description and return a clear error instead of a doomed request (#31).
+test("lichess_get_user_teams is flagged auth-required and returns an explanatory error (#31)", async () => {
+  const client = await connectedClient();
+
+  // The description flags the OAuth requirement before the tool is ever called.
+  const { tools } = await client.listTools();
+  const tool = tools.find((t) => t.name === "lichess_get_user_teams");
+  assert.ok(tool, "lichess_get_user_teams is registered");
+  assert.match(tool.description ?? "", /oauth|token/i, "description flags auth");
+
+  // Calling it returns a clear isError message (no network round-trip).
+  const res = await client.callTool({
+    name: "lichess_get_user_teams",
+    arguments: { username: "anyone" },
+  });
+  const content = (res.content ?? []) as Array<{ type: string; text?: string }>;
+  const body = content
+    .filter((c) => c.type === "text")
+    .map((c) => c.text ?? "")
+    .join("\n");
+  assert.equal(res.isError, true);
+  assert.match(body, /oauth|token|unavailable/i);
+  // Points users to the public alternatives that still work.
+  assert.match(body, /lichess_search_teams|lichess_get_team_members/);
+
+  await client.close();
+});

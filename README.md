@@ -56,7 +56,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `lichess_get_storm_dashboard` | Get a user's Puzzle Storm statistics |
 | `lichess_get_team` | Get a team's profile, description, and member count |
 | `lichess_search_teams` | Search for teams by name |
-| `lichess_get_user_teams` | Get all teams a user is a member of |
+| `lichess_get_user_teams` | Get all teams a user is a member of — _requires a Lichess OAuth token (`/api/team/of` is no longer public); this auth-less server returns an explanatory error. Token support planned ([#30](https://github.com/alegerber/chess-com-lichess-org-mcp/issues/30))_ |
 | `lichess_get_team_members` | Get the members of a Lichess team |
 | `lichess_get_current_tournaments` | Get the current tournament schedule |
 | `lichess_get_tournament` | Get details about a specific arena tournament |
