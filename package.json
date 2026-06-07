@@ -26,8 +26,8 @@
     "lichess.org",
     "model-context-protocol"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Alexander Gerber <alex.gerber90@gmail.com>",
+  "license": "MIT",
   "type": "commonjs",
   "bugs": {
     "url": "https://gitlab.com/devec/chess-com-lichess-org-mcp/issues"

@@ -125,4 +125,4 @@ Once configured, you can ask your LLM things like:
 
 ## License
 
-ISC
+[MIT](LICENSE)
