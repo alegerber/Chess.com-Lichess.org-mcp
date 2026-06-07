@@ -37,7 +37,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `get_streamers` | List Chess.com streamers |
 | `get_leaderboards` | Get leaderboards for all game types |
 
-### Lichess (24 tools)
+### Lichess (25 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -57,6 +57,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `lichess_get_team` | Get a team's profile, description, and member count |
 | `lichess_search_teams` | Search for teams by name |
 | `lichess_get_user_teams` | Get all teams a user is a member of |
+| `lichess_get_team_members` | Get the members of a Lichess team |
 | `lichess_get_current_tournaments` | Get the current tournament schedule |
 | `lichess_get_tournament` | Get details about a specific arena tournament |
 | `lichess_get_user_tournaments` | Get tournaments a user has played in |
