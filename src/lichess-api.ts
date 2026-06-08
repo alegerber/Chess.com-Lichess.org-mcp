@@ -17,6 +17,9 @@ export class LichessApiError extends Error {
 const JSON_TIMEOUT_MS = 10_000;
 const STREAM_TIMEOUT_MS = 30_000;
 
+/** Media type Lichess uses for raw PGN responses on game/export endpoints. */
+export const PGN_MEDIA_TYPE = "application/x-chess-pgn";
+
 async function fetchJson<T>(path: string): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const response = await fetch(url, {
@@ -35,6 +38,31 @@ async function fetchJson<T>(path: string): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+/**
+ * Fetch a raw text body (e.g. PGN) with an explicit Accept header. Game/export
+ * endpoints return PGN when asked via content negotiation (#46); the size cap is
+ * applied by the caller's formatter (capText) so this stays a thin transport.
+ */
+async function fetchText(path: string, accept: string): Promise<string> {
+  const url = `${BASE_URL}${path}`;
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: accept,
+    },
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new LichessApiError(
+      response.status,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+
+  return response.text();
 }
 
 /**
@@ -102,16 +130,70 @@ async function fetchNdjson<T>(path: string, maxLines?: number): Promise<T[]> {
 }
 
 /**
- * Fetch a raw text body (PGN). Used by the broadcast round PGN export (#38);
- * a single round is bounded, and the caller caps the displayed output.
+ * Fetch a raw text body (e.g. PGN) but stop and abort once maxChars have
+ * arrived. Tournament game exports are unbounded (a whole event), so this caps
+ * the *download*, not just the displayed output, keeping memory bounded.
  */
-async function fetchText(path: string): Promise<string> {
+async function fetchTextBounded(
+  path: string,
+  accept: string,
+  maxChars: number,
+): Promise<string> {
   const url = `${BASE_URL}${path}`;
   const response = await fetch(url, {
     headers: {
       "User-Agent": USER_AGENT,
-      Accept: "application/x-chess-pgn, text/plain, */*",
+      Accept: accept,
     },
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new LichessApiError(
+      response.status,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+
+  if (!response.body) return (await response.text()).slice(0, maxChars);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    if (buffer.length >= maxChars) {
+      await reader.cancel();
+      break;
+    }
+  }
+  buffer += decoder.decode();
+  // Honour the documented bound: the final flush can emit a few trailing bytes
+  // past maxChars, so clamp before returning.
+  return buffer.slice(0, maxChars);
+}
+
+/**
+ * POST a plain-text body (a comma-separated ID list) and return the raw text
+ * response with the requested Accept type. Used by the bulk endpoints (#43),
+ * which take the IDs in the request body and content-negotiate JSON/NDJSON/PGN.
+ */
+async function postText(
+  path: string,
+  body: string,
+  accept: string,
+): Promise<string> {
+  const url = `${BASE_URL}${path}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: accept,
+      "Content-Type": "text/plain",
+    },
+    body,
     signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
   });
 
@@ -225,7 +307,8 @@ export function getUserGames(
     color?: string;
     opening?: boolean;
   } = {},
-): Promise<unknown[]> {
+  asPgn = false,
+): Promise<unknown[] | string> {
   const query = new URLSearchParams();
   if (params.max !== undefined) query.set("max", String(params.max));
   if (params.since !== undefined) query.set("since", String(params.since));
@@ -237,13 +320,16 @@ export function getUserGames(
     query.set("opening", String(params.opening));
 
   const qs = query.toString();
-  return fetchNdjson(
-    `/api/games/user/${encodeURIComponent(username)}${qs ? `?${qs}` : ""}`,
-  );
+  const path = `/api/games/user/${encodeURIComponent(username)}${qs ? `?${qs}` : ""}`;
+  return asPgn ? fetchText(path, PGN_MEDIA_TYPE) : fetchNdjson(path);
 }
 
-export function getGameById(gameId: string): Promise<unknown> {
-  return fetchJson(`/game/export/${encodeURIComponent(gameId)}`);
+export function getGameById(
+  gameId: string,
+  asPgn = false,
+): Promise<unknown | string> {
+  const path = `/game/export/${encodeURIComponent(gameId)}`;
+  return asPgn ? fetchText(path, PGN_MEDIA_TYPE) : fetchJson(path);
 }
 
 export function getCurrentGame(username: string): Promise<unknown> {
@@ -388,10 +474,209 @@ export function getCrosstable(
   );
 }
 
+// ─── Bulk endpoints ────────────────────────────────────────────────
+
+// POST /api/users takes the IDs in the body (up to 300) and returns a JSON
+// array of full user objects.
+export function getUsersByIds(ids: string[]): Promise<LichessUser[]> {
+  return postText("/api/users", ids.join(","), "application/json").then(
+    (t) => JSON.parse(t) as LichessUser[],
+  );
+}
+
+// POST /api/games/export/_ids takes the game IDs in the body and content-
+// negotiates the format: NDJSON (parsed to an array) or raw PGN.
+export function exportGamesByIds(
+  ids: string[],
+  asPgn: boolean,
+): Promise<unknown[] | string> {
+  const body = ids.join(",");
+  return asPgn
+    ? postText("/api/games/export/_ids", body, PGN_MEDIA_TYPE)
+    : postText("/api/games/export/_ids", body, "application/x-ndjson").then(
+        (t) => parseNdjson(t),
+      );
+}
+
 // ─── Cloud eval ────────────────────────────────────────────────────
 
 export function getCloudEval(fen: string): Promise<unknown> {
   return fetchJson(`/api/cloud-eval?fen=${encodeURIComponent(fen)}`);
+}
+
+// ─── Swiss / Arena tournaments + Simuls ────────────────────────────
+
+// Shared caps: standings stream is bounded by rows; games (a whole event) by
+// characters so the PGN download itself stays bounded.
+const STANDINGS_MAX = 100;
+const TOURNEY_PGN_MAX_CHARS = 50_000;
+const TOURNEY_PGN_MEDIA_TYPE = "application/x-chess-pgn";
+
+export interface SwissInfo {
+  id: string;
+  name: string;
+  status: string;
+  variant: string;
+  round: number;
+  nbRounds: number;
+  nbPlayers: number;
+  nbOngoing?: number;
+  clock?: { limit: number; increment: number };
+  startsAt?: string;
+  createdBy?: string;
+}
+
+// One standings row, tolerant of the small differences between the Swiss
+// (`points`) and Arena (`score`) results streams.
+export interface StandingRow {
+  rank: number;
+  username: string;
+  rating?: number;
+  points?: number;
+  score?: number;
+  performance?: number;
+  title?: string;
+}
+
+export interface Simul {
+  id: string;
+  name: string;
+  fullName: string;
+  host: { name: string; id: string; rating?: number };
+  nbApplicants?: number;
+  nbPairings?: number;
+  variants?: { name: string }[];
+}
+
+export interface SimulsResponse {
+  pending?: Simul[];
+  created?: Simul[];
+  started?: Simul[];
+  finished?: Simul[];
+}
+
+export function getSwiss(id: string): Promise<SwissInfo> {
+  return fetchJson(`/api/swiss/${encodeURIComponent(id)}`);
+}
+
+export function getSwissResults(id: string): Promise<StandingRow[]> {
+  return fetchNdjson(
+    `/api/swiss/${encodeURIComponent(id)}/results`,
+    STANDINGS_MAX,
+  );
+}
+
+export function getSwissGames(
+  id: string,
+  asPgn: boolean,
+): Promise<unknown[] | string> {
+  const path = `/api/swiss/${encodeURIComponent(id)}/games`;
+  return asPgn
+    ? fetchTextBounded(path, TOURNEY_PGN_MEDIA_TYPE, TOURNEY_PGN_MAX_CHARS)
+    : fetchNdjson(path, STANDINGS_MAX);
+}
+
+export function getArenaResults(id: string): Promise<StandingRow[]> {
+  return fetchNdjson(
+    `/api/tournament/${encodeURIComponent(id)}/results`,
+    STANDINGS_MAX,
+  );
+}
+
+export function getArenaGames(
+  id: string,
+  asPgn: boolean,
+): Promise<unknown[] | string> {
+  const path = `/api/tournament/${encodeURIComponent(id)}/games`;
+  return asPgn
+    ? fetchTextBounded(path, TOURNEY_PGN_MEDIA_TYPE, TOURNEY_PGN_MAX_CHARS)
+    : fetchNdjson(path, STANDINGS_MAX);
+}
+
+export function getSimuls(): Promise<SimulsResponse> {
+  return fetchJson("/api/simul");
+}
+
+// ─── FIDE players ──────────────────────────────────────────────────
+
+export interface FidePlayer {
+  id: number;
+  name: string;
+  federation?: string;
+  year?: number;
+  title?: string;
+  standard?: number;
+  rapid?: number;
+  blitz?: number;
+  gender?: string;
+}
+
+export function getFidePlayer(playerId: number): Promise<FidePlayer> {
+  return fetchJson(`/api/fide/player/${playerId}`);
+}
+
+// Name search returns a JSON array (not NDJSON) of the same player objects.
+export function searchFidePlayers(query: string): Promise<FidePlayer[]> {
+  return fetchJson(`/api/fide/player?q=${encodeURIComponent(query)}`);
+}
+
+// ─── Player autocomplete ───────────────────────────────────────────
+
+export interface AutocompletePlayer {
+  id: string;
+  name: string;
+  title?: string;
+  patron?: boolean;
+  online?: boolean;
+  flair?: string;
+}
+
+export interface AutocompleteResult {
+  result: AutocompletePlayer[];
+}
+
+// object=true returns rich objects ({id,name,title,online,...}) instead of a
+// plain username array, so callers can show titles/online state.
+export function autocompletePlayers(term: string): Promise<AutocompleteResult> {
+  return fetchJson(
+    `/api/player/autocomplete?term=${encodeURIComponent(term)}&object=true`,
+  );
+}
+
+// ─── Studies ───────────────────────────────────────────────────────
+
+export interface StudyMetadata {
+  id: string;
+  name: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+const USER_STUDIES_MAX = 100;
+
+// Public studies only — private studies need a token (#30).
+export function getUserStudies(username: string): Promise<StudyMetadata[]> {
+  return fetchNdjson(
+    `/api/study/by/${encodeURIComponent(username)}`,
+    USER_STUDIES_MAX,
+  );
+}
+
+export function exportStudyPgn(studyId: string): Promise<string> {
+  return fetchText(
+    `/api/study/${encodeURIComponent(studyId)}.pgn`,
+    PGN_MEDIA_TYPE,
+  );
+}
+
+export function exportStudyChapterPgn(
+  studyId: string,
+  chapterId: string,
+): Promise<string> {
+  return fetchText(
+    `/api/study/${encodeURIComponent(studyId)}/${encodeURIComponent(chapterId)}.pgn`,
+    PGN_MEDIA_TYPE,
+  );
 }
 
 // ─── Broadcasts / live relays ──────────────────────────────────────
@@ -434,5 +719,8 @@ export function getBroadcastsByUser(
 }
 
 export function getBroadcastRoundPgn(roundId: string): Promise<string> {
-  return fetchText(`/api/broadcast/round/${encodeURIComponent(roundId)}.pgn`);
+  return fetchText(
+    `/api/broadcast/round/${encodeURIComponent(roundId)}.pgn`,
+    PGN_MEDIA_TYPE,
+  );
 }
