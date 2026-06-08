@@ -642,3 +642,39 @@ export function autocompletePlayers(term: string): Promise<AutocompleteResult> {
     `/api/player/autocomplete?term=${encodeURIComponent(term)}&object=true`,
   );
 }
+
+// ─── Studies ───────────────────────────────────────────────────────
+
+export interface StudyMetadata {
+  id: string;
+  name: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+const USER_STUDIES_MAX = 100;
+
+// Public studies only — private studies need a token (#30).
+export function getUserStudies(username: string): Promise<StudyMetadata[]> {
+  return fetchNdjson(
+    `/api/study/by/${encodeURIComponent(username)}`,
+    USER_STUDIES_MAX,
+  );
+}
+
+export function exportStudyPgn(studyId: string): Promise<string> {
+  return fetchText(
+    `/api/study/${encodeURIComponent(studyId)}.pgn`,
+    PGN_MEDIA_TYPE,
+  );
+}
+
+export function exportStudyChapterPgn(
+  studyId: string,
+  chapterId: string,
+): Promise<string> {
+  return fetchText(
+    `/api/study/${encodeURIComponent(studyId)}/${encodeURIComponent(chapterId)}.pgn`,
+    PGN_MEDIA_TYPE,
+  );
+}
