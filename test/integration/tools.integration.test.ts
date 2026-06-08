@@ -191,31 +191,6 @@ test("UAT 5.4 lichess_get_crosstable returns a head-to-head record", { skip: !RU
   assert.match(text, /Total games:/);
 });
 
-// ─── v2: FIDE players (#39) + autocomplete (#44) ───────────────────
-
-test("lichess_get_fide_player returns a FIDE profile by id", { skip: !RUN }, async () => {
-  const { text, isError } = await callText("lichess_get_fide_player", {
-    player_id: 1503014, // Magnus Carlsen — stable FIDE ID
-  });
-  assert.equal(isError, false);
-  assert.match(text, /FIDE ID: 1503014/);
-  assert.match(text, /Name: Carlsen/);
-});
-
-test("lichess_search_fide_players finds players by name", { skip: !RUN }, async () => {
-  const { text, isError } = await callText("lichess_search_fide_players", {
-    query: "Carlsen",
-  });
-  assert.equal(isError, false);
-  assert.match(text, /Found \d+ FIDE players|No FIDE players found/);
-});
-
-test("lichess_autocomplete_players resolves a partial username", { skip: !RUN }, async () => {
-  const { text, isError } = await callText("lichess_autocomplete_players", {
-    term: "magnus",
-  });
-  assert.equal(isError, false);
-  assert.match(text, /matching players|No matching players/);
 // ─── v2: PGN output option (#46) ───────────────────────────────────
 
 test("lichess_get_user_games format=pgn returns raw PGN", { skip: !RUN }, async () => {
@@ -253,4 +228,31 @@ test("get_titled_players paginates with offset/limit", { skip: !RUN }, async () 
   // There are far more than 10 GMs, so the second page is full and has a next hint.
   assert.match(text, /Showing 6–10 of \d+/);
   assert.match(text, /offset=10/);
+});
+
+// ─── v2: FIDE players (#39) + autocomplete (#44) ───────────────────
+
+test("lichess_get_fide_player returns a FIDE profile by id", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_fide_player", {
+    player_id: 1503014, // Magnus Carlsen — stable FIDE ID
+  });
+  assert.equal(isError, false);
+  assert.match(text, /FIDE ID: 1503014/);
+  assert.match(text, /Name: Carlsen/);
+});
+
+test("lichess_search_fide_players finds players by name", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_search_fide_players", {
+    query: "Carlsen",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Found \d+ FIDE players|No FIDE players found/);
+});
+
+test("lichess_autocomplete_players resolves a partial username", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_autocomplete_players", {
+    term: "magnus",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /matching players|No matching players/);
 });
