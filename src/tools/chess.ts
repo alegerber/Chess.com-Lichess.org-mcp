@@ -238,6 +238,42 @@ export function registerChessTools(server: McpServer): void {
     },
   );
 
+  server.registerTool(
+    "get_monthly_archive_pgn",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Get Monthly Archive (PGN)",
+      description:
+        "Get all of a player's games for a specific month as a single PGN document — a convenience over get_monthly_archives' per-game JSON.",
+      inputSchema: {
+        username: z.string().describe("Chess.com username"),
+        year: z
+          .number()
+          .int()
+          .min(2007)
+          .describe("Four-digit year (e.g. 2024)"),
+        month: z.number().int().min(1).max(12).describe("Month number (1-12)"),
+      },
+    },
+    ({ username, year, month }) => {
+      const mm = String(month).padStart(2, "0");
+      return call(
+        () => api.getMonthlyArchivePgn(username, year, month),
+        (pgn) => {
+          const trimmed = pgn.trim();
+          if (trimmed === "")
+            return `${username} played no games in ${year}/${mm}.`;
+          // Cap raw PGN so a busy month can't blow the context window.
+          const max = 50_000;
+          return trimmed.length <= max
+            ? trimmed
+            : trimmed.slice(0, max) +
+                `\n… truncated (${trimmed.length - max} more characters not shown)`;
+        },
+      );
+    },
+  );
+
   // ── Player participation tools ──────────────────────────────────────
 
   server.registerTool(

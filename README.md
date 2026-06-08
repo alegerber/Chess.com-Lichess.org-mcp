@@ -4,7 +4,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 
 ## Tools
 
-### Chess.com (28 tools)
+### Chess.com (29 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -15,6 +15,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `get_games_to_move` | Get daily games where it's the player's turn |
 | `get_game_archives` | List available monthly game archives for a player |
 | `get_monthly_archives` | Get all games from a specific month |
+| `get_monthly_archive_pgn` | Get a whole month of games as a single PGN document |
 | `get_player_clubs` | Get clubs a player belongs to |
 | `get_player_tournaments` | Get a player's tournament history |
 | `get_player_matches` | Get a player's team match history |
@@ -37,7 +38,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `get_streamers` | List Chess.com streamers |
 | `get_leaderboards` | Get leaderboards for all game types |
 
-### Lichess (28 tools)
+### Lichess (30 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -69,6 +70,8 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `lichess_get_fide_player` | Look up a FIDE player by numeric ID (name, federation, title, ratings) |
 | `lichess_search_fide_players` | Search FIDE players by name |
 | `lichess_autocomplete_players` | Resolve/disambiguate Lichess usernames from a partial term |
+| `lichess_export_games_by_ids` | Export many games at once by ID list (JSON or PGN) |
+| `lichess_get_users` | Fetch many users at once by username list (compact summary) |
 
 ## Install
 

@@ -117,6 +117,22 @@ export function formatAutocomplete(
   return `Found ${players.length} matching players:\n${names}`;
 }
 
+/** Compact one-line-per-user summary for the bulk users lookup (#43). */
+export function formatUsersBulk(users: lichess.LichessUser[]): string {
+  if (users.length === 0) return "No users found.";
+  const lines = users.map((u) => {
+    const title = u.title ? `${u.title} ` : "";
+    const perfs = u.perfs ?? {};
+    const ratings = ["bullet", "blitz", "rapid", "classical"]
+      .filter((k) => perfs[k])
+      .map((k) => `${k} ${perfs[k].rating}`)
+      .join(", ");
+    const games = u.count ? ` (${u.count.all} games)` : "";
+    return `${title}${u.username}${ratings ? ` — ${ratings}` : ""}${games}`;
+  });
+  return `Found ${users.length} users:\n${lines.join("\n")}`;
+}
+
 // ─── Error handler ─────────────────────────────────────────────────
 
 export async function call<T>(fn: () => Promise<T>, format: (d: T) => string) {
@@ -807,5 +823,65 @@ export function registerLichessTools(server: McpServer): void {
         () => lichess.autocompletePlayers(term),
         (d) => formatAutocomplete(d.result),
       ),
+  );
+
+  // ── Bulk endpoints ─────────────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_export_games_by_ids",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Export Games by IDs",
+      description:
+        "Export multiple Lichess games at once by their IDs (one round-trip). Returns JSON by default, or raw PGN with format=pgn.",
+      inputSchema: {
+        game_ids: z
+          .array(z.string())
+          .min(1)
+          .max(100)
+          .describe("Lichess game IDs (1-100)"),
+        format: z
+          .enum(["json", "pgn"])
+          .optional()
+          .describe("Output format: 'json' (default) or 'pgn'"),
+      },
+    },
+    ({ game_ids, format }) => {
+      const asPgn = format === "pgn";
+      return call(
+        () => lichess.exportGamesByIds(game_ids, asPgn),
+        (data) => {
+          if (asPgn) {
+            const pgn = String(data).trim();
+            return pgn === ""
+              ? "No games found for the given IDs."
+              : capText(pgn);
+          }
+          const games = data as unknown[];
+          return games.length === 0
+            ? "No games found for the given IDs."
+            : `Found ${games.length} games.\n\n${jsonBlock(games)}`;
+        },
+      );
+    },
+  );
+
+  server.registerTool(
+    "lichess_get_users",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Get Users by IDs",
+      description:
+        "Fetch multiple Lichess users at once by their usernames (one round-trip). Returns a compact per-user rating summary.",
+      inputSchema: {
+        usernames: z
+          .array(z.string())
+          .min(1)
+          .max(300)
+          .describe("Lichess usernames (1-300)"),
+      },
+    },
+    ({ usernames }) =>
+      call(() => lichess.getUsersByIds(usernames), formatUsersBulk),
   );
 }
