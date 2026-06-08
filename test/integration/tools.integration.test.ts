@@ -53,9 +53,9 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-test("tools/list exposes all 72 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 73 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 72);
+  assert.equal(tools.length, 73);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -407,4 +407,39 @@ test("lichess_get_broadcast_round_pgn returns a round's PGN feed", { skip: !RUN 
   });
   assert.equal(isError, false);
   assert.match(text, /\[Event |No PGN available/);
+});
+
+// ─── v2: Opening Explorer (#35) ────────────────────────────────────
+// NOTE: explorer.lichess.ovh rate-limits/blocks datacenter (CI) IPs with HTTP
+// 401, so these tolerate EITHER a real result OR a clean tagged error — they
+// verify the tool wiring end-to-end without depending on a reachable host.
+
+const STARTPOS = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+test("lichess_opening_explorer masters db returns totals or a tagged error", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_opening_explorer", {
+    db: "masters",
+    fen: STARTPOS,
+    moves: 5,
+  });
+  if (isError) {
+    assert.match(text, /Lichess error|request failed|timed out/i);
+  } else {
+    assert.match(text, /Total games:/);
+  }
+});
+
+test("lichess_opening_explorer player db returns a repertoire or a tagged error", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_opening_explorer", {
+    db: "player",
+    fen: STARTPOS,
+    player: "thibault",
+    color: "white",
+    moves: 5,
+  });
+  if (isError) {
+    assert.match(text, /Lichess error|request failed|timed out/i);
+  } else {
+    assert.match(text, /Total games:/);
+  }
 });

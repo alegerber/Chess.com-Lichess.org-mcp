@@ -14,11 +14,11 @@ src/
 ├── lichess-api.ts    # Lichess API client — typed fetch wrappers (JSON + NDJSON streaming)
 └── tools/
     ├── chess.ts      # Registers the 29 Chess.com tools (+ their formatters)
-    └── lichess.ts    # Registers the 43 Lichess tools (+ their formatters)
+    └── lichess.ts    # Registers the 44 Lichess tools (+ their formatters)
 ```
 
 - **`index.ts`** is the bootstrap. It creates an `McpServer`, calls `registerChessTools(server)` and `registerLichessTools(server)`, and connects via `StdioServerTransport`. The tool registrations live in `src/tools/`, not here.
-- **`src/tools/chess.ts` / `src/tools/lichess.ts`** register the 72 tools (29 Chess.com + 43 Lichess) via `server.registerTool()` and hold each tool's formatter. Handlers wrap their API call in a local `call(fn, format)` helper so failures are returned as tagged error results.
+- **`src/tools/chess.ts` / `src/tools/lichess.ts`** register the 73 tools (29 Chess.com + 44 Lichess) via `server.registerTool()` and hold each tool's formatter. Handlers wrap their API call in a local `call(fn, format)` helper so failures are returned as tagged error results.
 - **`format.ts`** holds shared, dependency-free helpers: `jsonBlock` (size-capped JSON), `truncated`, `toISOString`, `text` (the tool envelope with an `isError` flag), `errorResult` (maps thrown errors to tagged results), and `parseNdjson`.
 - **`chess-api.ts`** wraps the Chess.com Published-Data API (`https://api.chess.com/pub/...`). All responses are JSON.
 - **`lichess-api.ts`** wraps the Lichess API (`https://lichess.org/...`). Some endpoints return NDJSON — handled by `fetchNdjson()`, which streams line-by-line (with a line cap for unbounded endpoints).

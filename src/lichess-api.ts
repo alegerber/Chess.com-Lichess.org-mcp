@@ -724,3 +724,108 @@ export function getBroadcastRoundPgn(roundId: string): Promise<string> {
     PGN_MEDIA_TYPE,
   );
 }
+
+// ─── Opening Explorer ──────────────────────────────────────────────
+
+// The Opening Explorer lives on a separate host. The masters/lichess dbs
+// return a single JSON object; the player db streams NDJSON (progressive
+// results while indexing). Reading to completion and taking the last JSON line
+// works for both. Public, no auth.
+const EXPLORER_BASE = "https://explorer.lichess.ovh";
+
+export interface ExplorerMove {
+  uci: string;
+  san: string;
+  white: number;
+  draws: number;
+  black: number;
+  averageRating?: number;
+  averageOpponentRating?: number;
+  performance?: number;
+  opening?: { eco: string; name: string } | null;
+}
+
+export interface ExplorerResult {
+  white: number;
+  draws: number;
+  black: number;
+  moves: ExplorerMove[];
+  opening?: { eco: string; name: string } | null;
+}
+
+export interface ExplorerParams {
+  db: "masters" | "lichess" | "player";
+  fen: string;
+  play?: string;
+  variant?: string;
+  speeds?: string;
+  ratings?: string;
+  player?: string;
+  color?: string;
+  moves?: number;
+}
+
+async function fetchExplorer(
+  path: string,
+  query: URLSearchParams,
+): Promise<ExplorerResult> {
+  const url = `${EXPLORER_BASE}${path}?${query.toString()}`;
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "application/x-ndjson, application/json",
+    },
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new LichessApiError(
+      response.status,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+
+  // Take the last non-empty JSON line: one line for masters/lichess, the final
+  // (fully indexed) line for the player db's progressive NDJSON stream.
+  const body = await response.text();
+  const lines = body
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  // An empty 200 body would parse to "{}" and render as NaN totals downstream;
+  // surface it as a tagged error instead.
+  if (lines.length === 0) {
+    throw new LichessApiError(
+      502,
+      `Empty response from Opening Explorer (${url})`,
+    );
+  }
+  return JSON.parse(lines[lines.length - 1]) as ExplorerResult;
+}
+
+export function openingExplorer(
+  params: ExplorerParams,
+): Promise<ExplorerResult> {
+  const q = new URLSearchParams();
+  q.set("fen", params.fen);
+  if (params.play) q.set("play", params.play);
+  if (params.moves !== undefined) q.set("moves", String(params.moves));
+  if (params.db !== "masters") {
+    if (params.variant) q.set("variant", params.variant);
+    if (params.speeds) q.set("speeds", params.speeds);
+  }
+  if (params.db === "lichess" && params.ratings) {
+    q.set("ratings", params.ratings);
+  }
+  if (params.db === "player") {
+    if (params.player) q.set("player", params.player);
+    if (params.color) q.set("color", params.color);
+  }
+  const path =
+    params.db === "masters"
+      ? "/masters"
+      : params.db === "lichess"
+        ? "/lichess"
+        : "/player";
+  return fetchExplorer(path, q);
+}

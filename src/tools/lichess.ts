@@ -71,6 +71,36 @@ function formatPuzzle(data: lichess.LichessPuzzle): string {
   ].join("\n");
 }
 
+const EXPLORER_MOVE_CAP = 12;
+
+// Coerce a possibly-missing count to a number so a malformed payload renders 0
+// instead of NaN/undefined.
+const num = (v: number | undefined): number => (typeof v === "number" ? v : 0);
+
+export function formatOpeningExplorer(d: lichess.ExplorerResult): string {
+  const white = num(d.white);
+  const draws = num(d.draws);
+  const black = num(d.black);
+  const total = white + draws + black;
+  const lines: string[] = [];
+  if (d.opening) lines.push(`Opening: ${d.opening.name} (${d.opening.eco})`);
+  lines.push(`Total games: ${total} (W ${white} / D ${draws} / B ${black})`);
+  if (!d.moves || d.moves.length === 0) {
+    lines.push("No moves in this database for the position.");
+    return lines.join("\n");
+  }
+  lines.push("Top moves:");
+  for (const m of d.moves.slice(0, EXPLORER_MOVE_CAP)) {
+    const games = num(m.white) + num(m.draws) + num(m.black);
+    const rating = m.averageRating ?? m.averageOpponentRating;
+    const ratingStr = rating !== undefined ? `, avg ${rating}` : "";
+    lines.push(
+      `  ${m.san}: ${games} games (W ${num(m.white)}/D ${num(m.draws)}/B ${num(m.black)}${ratingStr})`,
+    );
+  }
+  return lines.join("\n");
+}
+
 /** One-line rating summary from a FIDE player's present rating fields. */
 function fideRatings(p: lichess.FidePlayer): string {
   const parts: string[] = [];
@@ -1200,6 +1230,79 @@ export function registerLichessTools(server: McpServer): void {
     },
     ({ round_id }) =>
       call(() => lichess.getBroadcastRoundPgn(round_id), capPgn),
+  );
+
+  // ── Opening Explorer ────────────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_opening_explorer",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Opening Explorer",
+      description:
+        "Look up a position in the Lichess Opening Explorer. db=masters (OTB master games), lichess (Lichess games, filterable by speeds/ratings), or player (a specific user's games — requires player and color). Returns the opening name, win/draw/loss totals, and the most common next moves.",
+      inputSchema: {
+        db: z
+          .enum(["masters", "lichess", "player"])
+          .describe("Which database to query"),
+        fen: z.string().describe("FEN of the position to look up"),
+        play: z
+          .string()
+          .optional()
+          .describe(
+            "Comma-separated UCI moves from the FEN (alternative drill-down)",
+          ),
+        variant: z
+          .string()
+          .optional()
+          .describe(
+            "Variant for the lichess/player db (e.g. standard, chess960)",
+          ),
+        speeds: z
+          .string()
+          .optional()
+          .describe(
+            "Comma-separated speeds for lichess/player db (e.g. blitz,rapid)",
+          ),
+        ratings: z
+          .string()
+          .optional()
+          .describe(
+            "Comma-separated rating bands for the lichess db (e.g. 2000,2200)",
+          ),
+        player: z
+          .string()
+          .optional()
+          .describe("Username — required when db=player"),
+        color: z
+          .enum(["white", "black"])
+          .optional()
+          .describe("Side the player had — used with db=player"),
+        moves: z
+          .number()
+          .int()
+          .min(1)
+          .max(30)
+          .optional()
+          .describe("Number of next moves to return (default upstream)"),
+      },
+    },
+    ({ db, fen, play, variant, speeds, ratings, player, color, moves }) =>
+      call(
+        () =>
+          lichess.openingExplorer({
+            db,
+            fen,
+            play,
+            variant,
+            speeds,
+            ratings,
+            player,
+            color,
+            moves,
+          }),
+        formatOpeningExplorer,
+      ),
   );
 }
 
