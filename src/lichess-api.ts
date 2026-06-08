@@ -369,3 +369,49 @@ export function getCrosstable(
 export function getCloudEval(fen: string): Promise<unknown> {
   return fetchJson(`/api/cloud-eval?fen=${encodeURIComponent(fen)}`);
 }
+
+// ─── FIDE players ──────────────────────────────────────────────────
+
+export interface FidePlayer {
+  id: number;
+  name: string;
+  federation?: string;
+  year?: number;
+  title?: string;
+  standard?: number;
+  rapid?: number;
+  blitz?: number;
+  gender?: string;
+}
+
+export function getFidePlayer(playerId: number): Promise<FidePlayer> {
+  return fetchJson(`/api/fide/player/${playerId}`);
+}
+
+// Name search returns a JSON array (not NDJSON) of the same player objects.
+export function searchFidePlayers(query: string): Promise<FidePlayer[]> {
+  return fetchJson(`/api/fide/player?q=${encodeURIComponent(query)}`);
+}
+
+// ─── Player autocomplete ───────────────────────────────────────────
+
+export interface AutocompletePlayer {
+  id: string;
+  name: string;
+  title?: string;
+  patron?: boolean;
+  online?: boolean;
+  flair?: string;
+}
+
+export interface AutocompleteResult {
+  result: AutocompletePlayer[];
+}
+
+// object=true returns rich objects ({id,name,title,online,...}) instead of a
+// plain username array, so callers can show titles/online state.
+export function autocompletePlayers(term: string): Promise<AutocompleteResult> {
+  return fetchJson(
+    `/api/player/autocomplete?term=${encodeURIComponent(term)}&object=true`,
+  );
+}
