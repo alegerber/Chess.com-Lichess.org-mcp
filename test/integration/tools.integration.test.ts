@@ -53,9 +53,9 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-test("tools/list exposes all 73 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 74 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 73);
+  assert.equal(tools.length, 74);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -442,4 +442,26 @@ test("lichess_opening_explorer player db returns a repertoire or a tagged error"
   } else {
     assert.match(text, /Total games:/);
   }
+});
+
+// ─── v2: Tablebase (#36) ───────────────────────────────────────────
+
+test("lichess_tablebase resolves a winning KQ vs K endgame", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_tablebase", {
+    variant: "standard",
+    fen: "4k3/8/8/8/8/8/8/4KQ2 w - - 0 1",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Position: win/);
+  assert.match(text, /DTZ/);
+  assert.match(text, /Best moves/);
+});
+
+test("lichess_tablebase resolves a drawn KvK position", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_tablebase", {
+    variant: "standard",
+    fen: "4k3/8/8/8/8/8/8/4K3 w - - 0 1",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Position: (draw|insufficient material)/);
 });
