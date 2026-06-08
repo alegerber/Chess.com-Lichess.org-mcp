@@ -41,6 +41,31 @@ async function fetchJson<T>(path: string): Promise<T> {
 }
 
 /**
+ * Fetch a raw text body (e.g. PGN) with an explicit Accept header. Game/export
+ * endpoints return PGN when asked via content negotiation (#46); the size cap is
+ * applied by the caller's formatter (capText) so this stays a thin transport.
+ */
+async function fetchText(path: string, accept: string): Promise<string> {
+  const url = `${BASE_URL}${path}`;
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: accept,
+    },
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new LichessApiError(
+      response.status,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+
+  return response.text();
+}
+
+/**
  * Parse NDJSON text into an array. CRLF-safe, skips blank and malformed lines
  * (so one truncated record never discards the whole result), and stops at
  * maxLines when provided.
@@ -236,7 +261,8 @@ export function getUserGames(
     color?: string;
     opening?: boolean;
   } = {},
-): Promise<unknown[]> {
+  asPgn = false,
+): Promise<unknown[] | string> {
   const query = new URLSearchParams();
   if (params.max !== undefined) query.set("max", String(params.max));
   if (params.since !== undefined) query.set("since", String(params.since));
@@ -248,13 +274,16 @@ export function getUserGames(
     query.set("opening", String(params.opening));
 
   const qs = query.toString();
-  return fetchNdjson(
-    `/api/games/user/${encodeURIComponent(username)}${qs ? `?${qs}` : ""}`,
-  );
+  const path = `/api/games/user/${encodeURIComponent(username)}${qs ? `?${qs}` : ""}`;
+  return asPgn ? fetchText(path, PGN_MEDIA_TYPE) : fetchNdjson(path);
 }
 
-export function getGameById(gameId: string): Promise<unknown> {
-  return fetchJson(`/game/export/${encodeURIComponent(gameId)}`);
+export function getGameById(
+  gameId: string,
+  asPgn = false,
+): Promise<unknown | string> {
+  const path = `/game/export/${encodeURIComponent(gameId)}`;
+  return asPgn ? fetchText(path, PGN_MEDIA_TYPE) : fetchJson(path);
 }
 
 export function getCurrentGame(username: string): Promise<unknown> {
@@ -427,4 +456,50 @@ export function exportGamesByIds(
 
 export function getCloudEval(fen: string): Promise<unknown> {
   return fetchJson(`/api/cloud-eval?fen=${encodeURIComponent(fen)}`);
+}
+
+// ─── FIDE players ──────────────────────────────────────────────────
+
+export interface FidePlayer {
+  id: number;
+  name: string;
+  federation?: string;
+  year?: number;
+  title?: string;
+  standard?: number;
+  rapid?: number;
+  blitz?: number;
+  gender?: string;
+}
+
+export function getFidePlayer(playerId: number): Promise<FidePlayer> {
+  return fetchJson(`/api/fide/player/${playerId}`);
+}
+
+// Name search returns a JSON array (not NDJSON) of the same player objects.
+export function searchFidePlayers(query: string): Promise<FidePlayer[]> {
+  return fetchJson(`/api/fide/player?q=${encodeURIComponent(query)}`);
+}
+
+// ─── Player autocomplete ───────────────────────────────────────────
+
+export interface AutocompletePlayer {
+  id: string;
+  name: string;
+  title?: string;
+  patron?: boolean;
+  online?: boolean;
+  flair?: string;
+}
+
+export interface AutocompleteResult {
+  result: AutocompletePlayer[];
+}
+
+// object=true returns rich objects ({id,name,title,online,...}) instead of a
+// plain username array, so callers can show titles/online state.
+export function autocompletePlayers(term: string): Promise<AutocompleteResult> {
+  return fetchJson(
+    `/api/player/autocomplete?term=${encodeURIComponent(term)}&object=true`,
+  );
 }

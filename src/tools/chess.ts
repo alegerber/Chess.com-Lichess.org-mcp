@@ -7,10 +7,29 @@ import {
   truncated,
   text,
   errorResult,
+  formatList,
 } from "../format.js";
 
 // All tools are read-only and talk to an external API.
 const READ_ONLY_HINTS = { readOnlyHint: true, openWorldHint: true };
+
+// Shared offset/limit inputs for tools that page client-side over a full list
+// the upstream returns without server-side paging (#45). Spread into inputSchema.
+const PAGE_PARAMS = {
+  offset: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe("Number of items to skip for paging (default 0)"),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(500)
+    .optional()
+    .describe("Maximum number of items to return on this page"),
+};
 
 // ─── Formatters ────────────────────────────────────────────────────
 
@@ -321,7 +340,7 @@ export function registerChessTools(server: McpServer): void {
       annotations: READ_ONLY_HINTS,
       title: "Get Titled Players",
       description:
-        "Get a list of usernames of players who hold a specific chess title. Valid titles: GM, WGM, IM, WIM, FM, WFM, NM, WNM, CM, WCM.",
+        "Get a list of usernames of players who hold a specific chess title. Valid titles: GM, WGM, IM, WIM, FM, WFM, NM, WNM, CM, WCM. Paginate with offset/limit.",
       inputSchema: {
         title: z
           .enum([
@@ -337,13 +356,19 @@ export function registerChessTools(server: McpServer): void {
             "WCM",
           ])
           .describe("Chess title abbreviation"),
+        ...PAGE_PARAMS,
       },
     },
-    ({ title }) =>
+    ({ title, offset, limit }) =>
       call(
         () => api.getTitledPlayers(title),
         (d) =>
-          `Found ${d.players.length} players with title ${title}.\n\nFirst 50: ${d.players.slice(0, 50).join(", ")}`,
+          formatList(d.players, {
+            offset: offset ?? 0,
+            limit: limit ?? 50,
+            label: "players",
+            subject: `with title ${title}`,
+          }),
       ),
   );
 
@@ -568,25 +593,26 @@ export function registerChessTools(server: McpServer): void {
     {
       annotations: READ_ONLY_HINTS,
       title: "Get Country Players",
-      description: "Get a list of player usernames from a specific country.",
+      description:
+        "Get a list of player usernames from a specific country. Paginate with offset/limit.",
       inputSchema: {
         iso_code: z
           .string()
           .length(2)
           .describe("2-letter ISO 3166 country code"),
+        ...PAGE_PARAMS,
       },
     },
-    ({ iso_code }) =>
+    ({ iso_code, offset, limit }) =>
       call(
         () => api.getCountryPlayers(iso_code),
-        (d) => {
-          const shown = d.players.slice(0, 100);
-          const note =
-            d.players.length > 100
-              ? `\n… ${d.players.length - 100} more players not shown`
-              : "";
-          return `Found ${d.players.length} players from ${iso_code.toUpperCase()}.\n\n${shown.join(", ")}${note}`;
-        },
+        (d) =>
+          formatList(d.players, {
+            offset: offset ?? 0,
+            limit: limit ?? 100,
+            label: "players",
+            subject: `from ${iso_code.toUpperCase()}`,
+          }),
       ),
   );
 
@@ -595,25 +621,27 @@ export function registerChessTools(server: McpServer): void {
     {
       annotations: READ_ONLY_HINTS,
       title: "Get Country Clubs",
-      description: "Get a list of club URLs from a specific country.",
+      description:
+        "Get a list of club URLs from a specific country. Paginate with offset/limit.",
       inputSchema: {
         iso_code: z
           .string()
           .length(2)
           .describe("2-letter ISO 3166 country code"),
+        ...PAGE_PARAMS,
       },
     },
-    ({ iso_code }) =>
+    ({ iso_code, offset, limit }) =>
       call(
         () => api.getCountryClubs(iso_code),
-        (d) => {
-          const shown = d.clubs.slice(0, 50);
-          const note =
-            d.clubs.length > 50
-              ? `\n… ${d.clubs.length - 50} more clubs not shown`
-              : "";
-          return `Found ${d.clubs.length} clubs from ${iso_code.toUpperCase()}.\n\n${shown.join("\n")}${note}`;
-        },
+        (d) =>
+          formatList(d.clubs, {
+            offset: offset ?? 0,
+            limit: limit ?? 50,
+            label: "clubs",
+            join: "\n",
+            subject: `from ${iso_code.toUpperCase()}`,
+          }),
       ),
   );
 
