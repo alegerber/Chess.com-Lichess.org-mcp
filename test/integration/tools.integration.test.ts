@@ -53,9 +53,9 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-test("tools/list exposes all 53 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 54 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 53);
+  assert.equal(tools.length, 54);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -186,6 +186,32 @@ test("UAT 5.4 lichess_get_crosstable returns a head-to-head record", { skip: !RU
   const { text, isError } = await callText("lichess_get_crosstable", {
     user1: "DrNykterstein",
     user2: "penguingim1",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Total games:/);
+});
+
+// ─── v2: Opening Explorer (#35) ────────────────────────────────────
+
+const STARTPOS = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+test("lichess_opening_explorer masters db returns totals and moves", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_opening_explorer", {
+    db: "masters",
+    fen: STARTPOS,
+    moves: 5,
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Total games:/);
+});
+
+test("lichess_opening_explorer player db returns a user's repertoire", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_opening_explorer", {
+    db: "player",
+    fen: STARTPOS,
+    player: "thibault",
+    color: "white",
+    moves: 5,
   });
   assert.equal(isError, false);
   assert.match(text, /Total games:/);
