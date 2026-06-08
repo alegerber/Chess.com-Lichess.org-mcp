@@ -37,7 +37,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `get_streamers` | List Chess.com streamers |
 | `get_leaderboards` | Get leaderboards for all game types |
 
-### Lichess (25 tools)
+### Lichess (31 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -66,6 +66,12 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `lichess_get_streamers` | Get currently live streamers on Twitch and YouTube |
 | `lichess_get_crosstable` | Get head-to-head record between two users |
 | `lichess_get_cloud_eval` | Get cloud engine evaluation for a FEN position |
+| `lichess_get_swiss` | Get a Swiss tournament's info (status, rounds, clock, players) |
+| `lichess_get_swiss_results` | Get a Swiss tournament's final standings (top 100) |
+| `lichess_get_swiss_games` | Export a Swiss tournament's games (JSON or PGN) |
+| `lichess_get_tournament_results` | Get an Arena tournament's final standings (top 100) |
+| `lichess_get_tournament_games` | Export an Arena tournament's games (JSON or PGN) |
+| `lichess_get_simuls` | List current simultaneous exhibitions (simuls) |
 
 ## Install
 
