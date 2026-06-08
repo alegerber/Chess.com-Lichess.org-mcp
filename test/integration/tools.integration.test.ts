@@ -190,3 +190,42 @@ test("UAT 5.4 lichess_get_crosstable returns a head-to-head record", { skip: !RU
   assert.equal(isError, false);
   assert.match(text, /Total games:/);
 });
+
+// ─── v2: PGN output option (#46) ───────────────────────────────────
+
+test("lichess_get_user_games format=pgn returns raw PGN", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_user_games", {
+    username: "DrNykterstein",
+    max: 1,
+    format: "pgn",
+  });
+  assert.equal(isError, false);
+  // Raw PGN starts with a tag pair, never a JSON brace.
+  assert.match(text, /\[Event |No games found/);
+  assert.doesNotMatch(text, /Found \d+ games/);
+});
+
+test("lichess_get_game format=pgn returns raw PGN for a game id", { skip: !RUN }, async () => {
+  // Stable historical game; PGN export is deterministic.
+  const { text, isError } = await callText("lichess_get_game", {
+    game_id: "kAdOQKeh",
+    format: "pgn",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event /);
+  assert.match(text, /\[Site "https:\/\/lichess\.org\/kAdOQKeh"\]/);
+});
+
+// ─── v2: pagination for hard-truncating Chess.com tools (#45) ──────
+
+test("get_titled_players paginates with offset/limit", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("get_titled_players", {
+    title: "GM",
+    offset: 5,
+    limit: 5,
+  });
+  assert.equal(isError, false);
+  // There are far more than 10 GMs, so the second page is full and has a next hint.
+  assert.match(text, /Showing 6–10 of \d+/);
+  assert.match(text, /offset=10/);
+});
