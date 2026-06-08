@@ -53,9 +53,9 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-test("tools/list exposes all 59 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 65 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 59);
+  assert.equal(tools.length, 65);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -293,4 +293,59 @@ test("get_monthly_archive_pgn returns a month of games as PGN", { skip: !RUN }, 
   });
   assert.equal(isError, false);
   assert.match(text, /\[Event |played no games/);
+});
+
+// ─── v2: Swiss (#37) + Arena (#41) + Simuls (#42) ──────────────────
+
+// Stable finished Swiss tournament (team 'coders', by thibault).
+const SWISS_ID = "5M5GxDJm";
+
+test("lichess_get_swiss returns tournament info", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_swiss", {
+    swiss_id: SWISS_ID,
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Name:/);
+  assert.match(text, /Rounds: \d+\/\d+/);
+});
+
+test("lichess_get_swiss_results returns standings", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_swiss_results", {
+    swiss_id: SWISS_ID,
+  });
+  assert.equal(isError, false);
+  assert.match(text, /players|No results/);
+});
+
+test("lichess_get_swiss_games returns PGN with format=pgn", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_swiss_games", {
+    swiss_id: SWISS_ID,
+    format: "pgn",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event |No games found/);
+});
+
+test("lichess_get_tournament_results returns arena standings", { skip: !RUN }, async () => {
+  // Lichess keeps tournaments indefinitely, so this finished arena id stays valid.
+  const { text, isError } = await callText("lichess_get_tournament_results", {
+    tournament_id: "evAxzsSV",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /players|No results/);
+});
+
+test("lichess_get_tournament_games returns arena games as PGN", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_tournament_games", {
+    tournament_id: "evAxzsSV",
+    format: "pgn",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event |No games found/);
+});
+
+test("lichess_get_simuls returns the simul groups", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_simuls");
+  assert.equal(isError, false);
+  assert.match(text, /Started:|Created:|Finished:/);
 });

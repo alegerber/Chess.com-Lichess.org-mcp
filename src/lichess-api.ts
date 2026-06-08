@@ -130,6 +130,52 @@ async function fetchNdjson<T>(path: string, maxLines?: number): Promise<T[]> {
 }
 
 /**
+ * Fetch a raw text body (e.g. PGN) but stop and abort once maxChars have
+ * arrived. Tournament game exports are unbounded (a whole event), so this caps
+ * the *download*, not just the displayed output, keeping memory bounded.
+ */
+async function fetchTextBounded(
+  path: string,
+  accept: string,
+  maxChars: number,
+): Promise<string> {
+  const url = `${BASE_URL}${path}`;
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: accept,
+    },
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new LichessApiError(
+      response.status,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+
+  if (!response.body) return (await response.text()).slice(0, maxChars);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    if (buffer.length >= maxChars) {
+      await reader.cancel();
+      break;
+    }
+  }
+  buffer += decoder.decode();
+  // Honour the documented bound: the final flush can emit a few trailing bytes
+  // past maxChars, so clamp before returning.
+  return buffer.slice(0, maxChars);
+}
+
+/**
  * POST a plain-text body (a comma-separated ID list) and return the raw text
  * response with the requested Accept type. Used by the bulk endpoints (#43),
  * which take the IDs in the request body and content-negotiate JSON/NDJSON/PGN.
@@ -456,6 +502,99 @@ export function exportGamesByIds(
 
 export function getCloudEval(fen: string): Promise<unknown> {
   return fetchJson(`/api/cloud-eval?fen=${encodeURIComponent(fen)}`);
+}
+
+// ─── Swiss / Arena tournaments + Simuls ────────────────────────────
+
+// Shared caps: standings stream is bounded by rows; games (a whole event) by
+// characters so the PGN download itself stays bounded.
+const STANDINGS_MAX = 100;
+const TOURNEY_PGN_MAX_CHARS = 50_000;
+const TOURNEY_PGN_MEDIA_TYPE = "application/x-chess-pgn";
+
+export interface SwissInfo {
+  id: string;
+  name: string;
+  status: string;
+  variant: string;
+  round: number;
+  nbRounds: number;
+  nbPlayers: number;
+  nbOngoing?: number;
+  clock?: { limit: number; increment: number };
+  startsAt?: string;
+  createdBy?: string;
+}
+
+// One standings row, tolerant of the small differences between the Swiss
+// (`points`) and Arena (`score`) results streams.
+export interface StandingRow {
+  rank: number;
+  username: string;
+  rating?: number;
+  points?: number;
+  score?: number;
+  performance?: number;
+  title?: string;
+}
+
+export interface Simul {
+  id: string;
+  name: string;
+  fullName: string;
+  host: { name: string; id: string; rating?: number };
+  nbApplicants?: number;
+  nbPairings?: number;
+  variants?: { name: string }[];
+}
+
+export interface SimulsResponse {
+  pending?: Simul[];
+  created?: Simul[];
+  started?: Simul[];
+  finished?: Simul[];
+}
+
+export function getSwiss(id: string): Promise<SwissInfo> {
+  return fetchJson(`/api/swiss/${encodeURIComponent(id)}`);
+}
+
+export function getSwissResults(id: string): Promise<StandingRow[]> {
+  return fetchNdjson(
+    `/api/swiss/${encodeURIComponent(id)}/results`,
+    STANDINGS_MAX,
+  );
+}
+
+export function getSwissGames(
+  id: string,
+  asPgn: boolean,
+): Promise<unknown[] | string> {
+  const path = `/api/swiss/${encodeURIComponent(id)}/games`;
+  return asPgn
+    ? fetchTextBounded(path, TOURNEY_PGN_MEDIA_TYPE, TOURNEY_PGN_MAX_CHARS)
+    : fetchNdjson(path, STANDINGS_MAX);
+}
+
+export function getArenaResults(id: string): Promise<StandingRow[]> {
+  return fetchNdjson(
+    `/api/tournament/${encodeURIComponent(id)}/results`,
+    STANDINGS_MAX,
+  );
+}
+
+export function getArenaGames(
+  id: string,
+  asPgn: boolean,
+): Promise<unknown[] | string> {
+  const path = `/api/tournament/${encodeURIComponent(id)}/games`;
+  return asPgn
+    ? fetchTextBounded(path, TOURNEY_PGN_MEDIA_TYPE, TOURNEY_PGN_MAX_CHARS)
+    : fetchNdjson(path, STANDINGS_MAX);
+}
+
+export function getSimuls(): Promise<SimulsResponse> {
+  return fetchJson("/api/simul");
 }
 
 // ─── FIDE players ──────────────────────────────────────────────────
