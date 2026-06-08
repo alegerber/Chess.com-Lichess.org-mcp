@@ -21,7 +21,7 @@ async function connectedClient(): Promise<Client> {
 test("every tool is annotated read-only and open-world (L3)", async () => {
   const client = await connectedClient();
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 56);
+  assert.equal(tools.length, 68);
   for (const t of tools) {
     assert.equal(t.annotations?.readOnlyHint, true, `${t.name}: readOnlyHint`);
     assert.equal(t.annotations?.openWorldHint, true, `${t.name}: openWorldHint`);

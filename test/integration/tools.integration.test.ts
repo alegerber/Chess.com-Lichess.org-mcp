@@ -53,9 +53,9 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-test("tools/list exposes all 56 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 68 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 56);
+  assert.equal(tools.length, 68);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -189,6 +189,165 @@ test("UAT 5.4 lichess_get_crosstable returns a head-to-head record", { skip: !RU
   });
   assert.equal(isError, false);
   assert.match(text, /Total games:/);
+});
+
+// ─── v2: PGN output option (#46) ───────────────────────────────────
+
+test("lichess_get_user_games format=pgn returns raw PGN", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_user_games", {
+    username: "DrNykterstein",
+    max: 1,
+    format: "pgn",
+  });
+  assert.equal(isError, false);
+  // Raw PGN starts with a tag pair, never a JSON brace.
+  assert.match(text, /\[Event |No games found/);
+  assert.doesNotMatch(text, /Found \d+ games/);
+});
+
+test("lichess_get_game format=pgn returns raw PGN for a game id", { skip: !RUN }, async () => {
+  // Stable historical game; PGN export is deterministic.
+  const { text, isError } = await callText("lichess_get_game", {
+    game_id: "kAdOQKeh",
+    format: "pgn",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event /);
+  assert.match(text, /\[Site "https:\/\/lichess\.org\/kAdOQKeh"\]/);
+});
+
+// ─── v2: pagination for hard-truncating Chess.com tools (#45) ──────
+
+test("get_titled_players paginates with offset/limit", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("get_titled_players", {
+    title: "GM",
+    offset: 5,
+    limit: 5,
+  });
+  assert.equal(isError, false);
+  // There are far more than 10 GMs, so the second page is full and has a next hint.
+  assert.match(text, /Showing 6–10 of \d+/);
+  assert.match(text, /offset=10/);
+});
+
+// ─── v2: FIDE players (#39) + autocomplete (#44) ───────────────────
+
+test("lichess_get_fide_player returns a FIDE profile by id", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_fide_player", {
+    player_id: 1503014, // Magnus Carlsen — stable FIDE ID
+  });
+  assert.equal(isError, false);
+  assert.match(text, /FIDE ID: 1503014/);
+  assert.match(text, /Name: Carlsen/);
+});
+
+test("lichess_search_fide_players finds players by name", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_search_fide_players", {
+    query: "Carlsen",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Found \d+ FIDE players|No FIDE players found/);
+});
+
+test("lichess_autocomplete_players resolves a partial username", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_autocomplete_players", {
+    term: "magnus",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /matching players|No matching players/);
+});
+
+// ─── v2: bulk endpoints (#43) + Chess.com monthly PGN (#47) ────────
+
+test("lichess_export_games_by_ids returns the requested games as JSON", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_export_games_by_ids", {
+    game_ids: ["kAdOQKeh"],
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Found \d+ games|No games found/);
+});
+
+test("lichess_export_games_by_ids returns PGN when format=pgn", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_export_games_by_ids", {
+    game_ids: ["kAdOQKeh"],
+    format: "pgn",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event /);
+});
+
+test("lichess_get_users fetches multiple users at once", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_users", {
+    usernames: ["thibault", "neio"],
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Found 2 users/);
+  assert.match(text, /thibault/);
+});
+
+test("get_monthly_archive_pgn returns a month of games as PGN", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("get_monthly_archive_pgn", {
+    username: "erik",
+    year: 2009,
+    month: 10,
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event |played no games/);
+});
+
+// ─── v2: Swiss (#37) + Arena (#41) + Simuls (#42) ──────────────────
+
+// Stable finished Swiss tournament (team 'coders', by thibault).
+const SWISS_ID = "5M5GxDJm";
+
+test("lichess_get_swiss returns tournament info", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_swiss", {
+    swiss_id: SWISS_ID,
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Name:/);
+  assert.match(text, /Rounds: \d+\/\d+/);
+});
+
+test("lichess_get_swiss_results returns standings", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_swiss_results", {
+    swiss_id: SWISS_ID,
+  });
+  assert.equal(isError, false);
+  assert.match(text, /players|No results/);
+});
+
+test("lichess_get_swiss_games returns PGN with format=pgn", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_swiss_games", {
+    swiss_id: SWISS_ID,
+    format: "pgn",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event |No games found/);
+});
+
+test("lichess_get_tournament_results returns arena standings", { skip: !RUN }, async () => {
+  // Lichess keeps tournaments indefinitely, so this finished arena id stays valid.
+  const { text, isError } = await callText("lichess_get_tournament_results", {
+    tournament_id: "evAxzsSV",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /players|No results/);
+});
+
+test("lichess_get_tournament_games returns arena games as PGN", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_tournament_games", {
+    tournament_id: "evAxzsSV",
+    format: "pgn",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event |No games found/);
+});
+
+test("lichess_get_simuls returns the simul groups", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_simuls");
+  assert.equal(isError, false);
+  assert.match(text, /Started:|Created:|Finished:/);
 });
 
 // ─── v2: Studies (#40) ─────────────────────────────────────────────
