@@ -71,24 +71,29 @@ function formatPuzzle(data: lichess.LichessPuzzle): string {
 
 const EXPLORER_MOVE_CAP = 12;
 
+// Coerce a possibly-missing count to a number so a malformed payload renders 0
+// instead of NaN/undefined.
+const n = (v: number | undefined): number => (typeof v === "number" ? v : 0);
+
 export function formatOpeningExplorer(d: lichess.ExplorerResult): string {
-  const total = d.white + d.draws + d.black;
+  const white = n(d.white);
+  const draws = n(d.draws);
+  const black = n(d.black);
+  const total = white + draws + black;
   const lines: string[] = [];
   if (d.opening) lines.push(`Opening: ${d.opening.name} (${d.opening.eco})`);
-  lines.push(
-    `Total games: ${total} (W ${d.white} / D ${d.draws} / B ${d.black})`,
-  );
+  lines.push(`Total games: ${total} (W ${white} / D ${draws} / B ${black})`);
   if (!d.moves || d.moves.length === 0) {
     lines.push("No moves in this database for the position.");
     return lines.join("\n");
   }
   lines.push("Top moves:");
   for (const m of d.moves.slice(0, EXPLORER_MOVE_CAP)) {
-    const games = m.white + m.draws + m.black;
+    const games = n(m.white) + n(m.draws) + n(m.black);
     const rating = m.averageRating ?? m.averageOpponentRating;
     const ratingStr = rating !== undefined ? `, avg ${rating}` : "";
     lines.push(
-      `  ${m.san}: ${games} games (W ${m.white}/D ${m.draws}/B ${m.black}${ratingStr})`,
+      `  ${m.san}: ${games} games (W ${n(m.white)}/D ${n(m.draws)}/B ${n(m.black)}${ratingStr})`,
     );
   }
   return lines.join("\n");

@@ -437,7 +437,15 @@ async function fetchExplorer(
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
-  return JSON.parse(lines[lines.length - 1] ?? "{}") as ExplorerResult;
+  // An empty 200 body would parse to "{}" and render as NaN totals downstream;
+  // surface it as a tagged error instead.
+  if (lines.length === 0) {
+    throw new LichessApiError(
+      502,
+      `Empty response from Opening Explorer (${url})`,
+    );
+  }
+  return JSON.parse(lines[lines.length - 1]) as ExplorerResult;
 }
 
 export function openingExplorer(

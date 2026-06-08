@@ -48,3 +48,13 @@ test("formatOpeningExplorer reports an empty position", () => {
   const out = lichessTools.formatOpeningExplorer(data);
   assert.match(out, /No moves in this database/);
 });
+
+test("formatOpeningExplorer tolerates a response missing totals (no NaN)", () => {
+  // A malformed/empty payload must not render NaN or undefined.
+  const out = lichessTools.formatOpeningExplorer({
+    moves: [],
+  } as unknown as ExplorerResult);
+  assert.doesNotMatch(out, /NaN/);
+  assert.doesNotMatch(out, /undefined/);
+  assert.match(out, /Total games: 0/);
+});
