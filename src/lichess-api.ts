@@ -142,7 +142,9 @@ async function fetchTextBounded(
     }
   }
   buffer += decoder.decode();
-  return buffer;
+  // Honour the documented bound: the final flush can emit a few trailing bytes
+  // past maxChars, so clamp before returning.
+  return buffer.slice(0, maxChars);
 }
 
 // ─── User endpoints ────────────────────────────────────────────────
