@@ -59,6 +59,55 @@ export function formatUserTeams(teams: lichess.LichessTeam[]): string {
   return `Found ${teams.length} teams:\n${lines.join("\n")}`;
 }
 
+/** Compact page of the most popular teams (#58, /api/team/all). */
+export function formatPopularTeams(data: lichess.PaginatedTeams): string {
+  const teams = data.currentPageResults ?? [];
+  if (teams.length === 0) return "No teams found.";
+  const lines = teams.map(
+    (t) => `- ${t.name} (${t.id}, ${t.nbMembers} members)`,
+  );
+  const cursor = data.nbPages
+    ? ` (page ${data.currentPage ?? 1}/${data.nbPages})`
+    : "";
+  return `Popular teams${cursor}:\n${lines.join("\n")}`;
+}
+
+// Arena's `status` is a numeric code; Swiss reports a string status directly.
+const ARENA_STATUS: Record<number, string> = {
+  10: "created",
+  20: "started",
+  30: "finished",
+};
+
+// These listing endpoints return `startsAt` as an ISO string, but other
+// tournament endpoints use an epoch (ms) number — tolerate both.
+function tournamentDate(startsAt?: number | string): string {
+  if (startsAt == null) return "date unknown";
+  return typeof startsAt === "number" ? toISOString(startsAt) : startsAt;
+}
+
+/** Compact list of a team's Swiss tournaments (#58, /api/team/{id}/swiss). */
+export function formatTeamSwiss(tournaments: lichess.SwissInfo[]): string {
+  if (tournaments.length === 0) return "This team has no Swiss tournaments.";
+  const lines = tournaments.map(
+    (t) =>
+      `- ${t.name} (${t.id}) — ${t.status}, ${tournamentDate(t.startsAt)} (${t.nbRounds} rounds)`,
+  );
+  return `Found ${tournaments.length} Swiss tournaments:\n${lines.join("\n")}`;
+}
+
+/** Compact list of a team's Arena tournaments (#58, /api/team/{id}/arena). */
+export function formatTeamArena(
+  tournaments: lichess.ArenaTournament[],
+): string {
+  if (tournaments.length === 0) return "This team has no Arena tournaments.";
+  const lines = tournaments.map((t) => {
+    const status = ARENA_STATUS[t.status] ?? `status ${t.status}`;
+    return `- ${t.fullName} (${t.id}) — ${status}, ${tournamentDate(t.startsAt)} (${t.nbPlayers ?? 0} players)`;
+  });
+  return `Found ${tournaments.length} Arena tournaments:\n${lines.join("\n")}`;
+}
+
 function formatPuzzle(data: lichess.LichessPuzzle): string {
   return [
     `Puzzle ID: ${data.puzzle.id}`,
@@ -743,6 +792,75 @@ export function registerLichessTools(server: McpServer): void {
       call(
         () => lichess.getTeamMembers(team_id),
         (members) => truncated(members, 50, "members"),
+      ),
+  );
+
+  server.registerTool(
+    "lichess_get_popular_teams",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Popular Teams",
+      description: "List the most popular Lichess teams (paginated).",
+      inputSchema: {
+        page: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe("Page number (default 1)"),
+      },
+    },
+    ({ page }) =>
+      call(() => lichess.getPopularTeams(page ?? 1), formatPopularTeams),
+  );
+
+  server.registerTool(
+    "lichess_get_team_swiss_tournaments",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Team Swiss Tournaments",
+      description:
+        "List a Lichess team's Swiss tournaments (most recent first).",
+      inputSchema: {
+        team_id: z.string().describe("Lichess team ID / slug"),
+        max: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Max tournaments to return (default 30, max 100)"),
+      },
+    },
+    ({ team_id, max }) =>
+      call(
+        () => lichess.getTeamSwissTournaments(team_id, max ?? 30),
+        formatTeamSwiss,
+      ),
+  );
+
+  server.registerTool(
+    "lichess_get_team_arena_tournaments",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Team Arena Tournaments",
+      description:
+        "List a Lichess team's Arena tournaments (most recent first).",
+      inputSchema: {
+        team_id: z.string().describe("Lichess team ID / slug"),
+        max: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Max tournaments to return (default 30, max 100)"),
+      },
+    },
+    ({ team_id, max }) =>
+      call(
+        () => lichess.getTeamArenaTournaments(team_id, max ?? 30),
+        formatTeamArena,
       ),
   );
 
