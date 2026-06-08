@@ -101,6 +101,30 @@ async function fetchNdjson<T>(path: string, maxLines?: number): Promise<T[]> {
   return parseNdjson<T>(buffer, maxLines);
 }
 
+/**
+ * Fetch a raw text body (PGN). Used by the study PGN exports (#40); a single
+ * study/chapter is bounded by nature, and the caller caps the displayed output.
+ */
+async function fetchText(path: string): Promise<string> {
+  const url = `${BASE_URL}${path}`;
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "application/x-chess-pgn, text/plain, */*",
+    },
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new LichessApiError(
+      response.status,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+
+  return response.text();
+}
+
 // ─── User endpoints ────────────────────────────────────────────────
 
 export interface LichessUser {
@@ -368,4 +392,36 @@ export function getCrosstable(
 
 export function getCloudEval(fen: string): Promise<unknown> {
   return fetchJson(`/api/cloud-eval?fen=${encodeURIComponent(fen)}`);
+}
+
+// ─── Studies ───────────────────────────────────────────────────────
+
+export interface StudyMetadata {
+  id: string;
+  name: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+const USER_STUDIES_MAX = 100;
+
+// Public studies only — private studies need a token (#30).
+export function getUserStudies(username: string): Promise<StudyMetadata[]> {
+  return fetchNdjson(
+    `/api/study/by/${encodeURIComponent(username)}`,
+    USER_STUDIES_MAX,
+  );
+}
+
+export function exportStudyPgn(studyId: string): Promise<string> {
+  return fetchText(`/api/study/${encodeURIComponent(studyId)}.pgn`);
+}
+
+export function exportStudyChapterPgn(
+  studyId: string,
+  chapterId: string,
+): Promise<string> {
+  return fetchText(
+    `/api/study/${encodeURIComponent(studyId)}/${encodeURIComponent(chapterId)}.pgn`,
+  );
 }

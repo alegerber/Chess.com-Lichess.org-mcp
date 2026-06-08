@@ -53,9 +53,9 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-test("tools/list exposes all 53 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 56 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 53);
+  assert.equal(tools.length, 56);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -189,4 +189,32 @@ test("UAT 5.4 lichess_get_crosstable returns a head-to-head record", { skip: !RU
   });
   assert.equal(isError, false);
   assert.match(text, /Total games:/);
+});
+
+// ─── v2: Studies (#40) ─────────────────────────────────────────────
+
+test("lichess_get_user_studies lists a user's public studies", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_user_studies", {
+    username: "thibault",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Found \d+ studies|No public studies/);
+});
+
+test("lichess_export_study_pgn returns the study as PGN", { skip: !RUN }, async () => {
+  // Stable public study by thibault.
+  const { text, isError } = await callText("lichess_export_study_pgn", {
+    study_id: "1UmQwWtW",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event |\[White |\[Site /);
+});
+
+test("lichess_export_study_chapter_pgn surfaces a clean error for an invalid chapter", { skip: !RUN }, async () => {
+  // Chapter IDs are not publicly enumerable; verify graceful error handling.
+  const { isError } = await callText("lichess_export_study_chapter_pgn", {
+    study_id: "1UmQwWtW",
+    chapter_id: "zzzzzzzz",
+  });
+  assert.equal(isError, true);
 });

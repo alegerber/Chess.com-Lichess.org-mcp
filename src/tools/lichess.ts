@@ -69,6 +69,27 @@ function formatPuzzle(data: lichess.LichessPuzzle): string {
   ].join("\n");
 }
 
+// Char budget for raw PGN output so a large study can't blow the window.
+const PGN_MAX_CHARS = 50_000;
+
+function capPgn(pgn: string): string {
+  const trimmed = pgn.trim();
+  return trimmed.length <= PGN_MAX_CHARS
+    ? trimmed
+    : trimmed.slice(0, PGN_MAX_CHARS) +
+        `\n… truncated (${trimmed.length - PGN_MAX_CHARS} more characters not shown)`;
+}
+
+export function formatStudies(studies: lichess.StudyMetadata[]): string {
+  if (studies.length === 0) return "No public studies found.";
+  const lines = studies.map((s) => {
+    const updated =
+      s.updatedAt !== undefined ? ` — updated ${toISOString(s.updatedAt)}` : "";
+    return `- ${s.name} (${s.id})${updated}`;
+  });
+  return `Found ${studies.length} studies:\n${lines.join("\n")}`;
+}
+
 // ─── Error handler ─────────────────────────────────────────────────
 
 export async function call<T>(fn: () => Promise<T>, format: (d: T) => string) {
@@ -660,5 +681,52 @@ export function registerLichessTools(server: McpServer): void {
       },
     },
     ({ fen }) => call(() => lichess.getCloudEval(fen), jsonBlock),
+  );
+
+  // ── Studies ────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_get_user_studies",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: User's Studies",
+      description:
+        "List a Lichess user's public studies (metadata: name, id, updated date). Use the id with the study PGN export tools.",
+      inputSchema: {
+        username: z.string().describe("Lichess username"),
+      },
+    },
+    ({ username }) =>
+      call(() => lichess.getUserStudies(username), formatStudies),
+  );
+
+  server.registerTool(
+    "lichess_export_study_pgn",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Export Study PGN",
+      description:
+        "Export an entire public Lichess study as PGN (all chapters), ready for engine/repertoire analysis.",
+      inputSchema: {
+        study_id: z.string().describe("Lichess study ID (8 characters)"),
+      },
+    },
+    ({ study_id }) => call(() => lichess.exportStudyPgn(study_id), capPgn),
+  );
+
+  server.registerTool(
+    "lichess_export_study_chapter_pgn",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Export Study Chapter PGN",
+      description:
+        "Export a single chapter of a public Lichess study as PGN. The chapter ID comes from the chapter's URL (lichess.org/study/{studyId}/{chapterId}).",
+      inputSchema: {
+        study_id: z.string().describe("Lichess study ID (8 characters)"),
+        chapter_id: z.string().describe("Study chapter ID (8 characters)"),
+      },
+    },
+    ({ study_id, chapter_id }) =>
+      call(() => lichess.exportStudyChapterPgn(study_id, chapter_id), capPgn),
   );
 }
