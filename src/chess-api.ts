@@ -5,6 +5,9 @@ const BASE_URL = "https://api.chess.com/pub";
 const USER_AGENT = `chess-com-lichess-org-mcp/${VERSION} (MCP Server; https://github.com/alegerber/chess-com-lichess-org-mcp)`;
 
 const JSON_TIMEOUT_MS = 10_000;
+// A whole month of games can be a large PGN download, so allow longer than the
+// JSON endpoints (#47).
+const PGN_TIMEOUT_MS = 30_000;
 
 export class ChessComApiError extends Error {
   constructor(
@@ -34,6 +37,28 @@ async function fetchApi<T>(path: string): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+// Raw-text fetch for the PGN endpoints, which serve PGN at a `/pgn` path
+// regardless of Accept (#47). The caller caps the size.
+async function fetchText(path: string): Promise<string> {
+  const url = `${BASE_URL}${path}`;
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "application/x-chess-pgn, text/plain, */*",
+    },
+    signal: AbortSignal.timeout(PGN_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new ChessComApiError(
+      response.status,
+      `Chess.com API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+
+  return response.text();
 }
 
 // ─── Player endpoints ──────────────────────────────────────────────
@@ -117,6 +142,19 @@ export function getMonthlyArchive(
   const mm = String(month).padStart(2, "0");
   return fetchApi(
     `/player/${encodeURIComponent(username.toLowerCase())}/games/${year}/${mm}`,
+  );
+}
+
+// Bulk monthly PGN: one PGN document for an entire month (#47), a convenience
+// over getMonthlyArchive's per-game JSON+PGN.
+export function getMonthlyArchivePgn(
+  username: string,
+  year: number,
+  month: number,
+): Promise<string> {
+  const mm = String(month).padStart(2, "0");
+  return fetchText(
+    `/player/${encodeURIComponent(username.toLowerCase())}/games/${year}/${mm}/pgn`,
   );
 }
 

@@ -11,6 +11,30 @@ export function jsonBlock(data: unknown): string {
 }
 
 /**
+ * Cap raw text (e.g. PGN) at a character budget with a truncation marker, so a
+ * large export can never blow the context window. Mirrors jsonBlock's backstop
+ * for non-JSON payloads.
+ */
+export function capText(s: string, max = JSON_BLOCK_MAX_CHARS): string {
+  if (s.length <= max) return s;
+  return (
+    s.slice(0, max) +
+    `\n… truncated (${s.length - max} more characters not shown)`
+  );
+}
+
+/**
+ * Render a game/export payload as raw PGN text (size-capped) when asPgn is set,
+ * otherwise as a JSON block. Shared by the game/export tools that accept a
+ * `format: json | pgn` option (#46).
+ */
+export function pgnOrJson(data: unknown, asPgn: boolean): string {
+  return asPgn
+    ? capText(typeof data === "string" ? data : String(data))
+    : jsonBlock(data);
+}
+
+/**
  * Convert a Unix timestamp to ISO string. Chess.com uses seconds; Lichess uses milliseconds.
  * Returns "unknown" for missing/non-finite input instead of throwing — some upstream
  * responses (e.g. closed/disabled accounts) omit timestamp fields the types mark as required.
@@ -32,6 +56,67 @@ export function truncated(
     jsonBlock(items.slice(0, max)) +
     `\n… ${items.length - max} more ${label} not shown`
   );
+}
+
+/** A single page taken from a fully-materialized list (client-side paging). */
+export interface Page<T> {
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+  /** Offset to request the next page, or null when this is the last page. */
+  nextOffset: number | null;
+}
+
+/**
+ * Slice a window out of a fully-materialized list. Several Chess.com endpoints
+ * return the entire list with no server-side paging, so callers page through it
+ * client-side via offset/limit (#45). Out-of-range and negative offsets are
+ * clamped instead of throwing.
+ */
+export function paginate<T>(items: T[], offset = 0, limit = 50): Page<T> {
+  const total = items.length;
+  const safeOffset = Math.max(0, Math.min(offset, total));
+  const page = items.slice(safeOffset, safeOffset + Math.max(0, limit));
+  const end = safeOffset + page.length;
+  return {
+    items: page,
+    total,
+    offset: safeOffset,
+    limit,
+    nextOffset: end < total ? end : null,
+  };
+}
+
+/**
+ * Render a paginated string list with a total count, the shown range, and a
+ * hint for fetching the next page. Shared by the paginated Chess.com list tools
+ * (#45) so they present truncation consistently instead of ad-hoc "N more not
+ * shown" suffixes.
+ */
+export function formatList(
+  items: string[],
+  opts: {
+    offset?: number;
+    limit?: number;
+    label: string;
+    join?: string;
+    subject?: string;
+  },
+): string {
+  const { offset = 0, limit = 50, label, join = ", ", subject } = opts;
+  const p = paginate(items, offset, limit);
+  const header = `Found ${p.total} ${label}${subject ? ` ${subject}` : ""}.`;
+  // No items to show (empty list, or an offset past the end): header only,
+  // never a backwards range like "Showing 6–5 of 5".
+  if (p.items.length === 0) return header;
+  const start = p.offset + 1;
+  const end = p.offset + p.items.length;
+  const more =
+    p.nextOffset !== null
+      ? ` (pass offset=${p.nextOffset} for the next page)`
+      : "";
+  return `${header}\nShowing ${start}–${end} of ${p.total}${more}\n\n${p.items.join(join)}`;
 }
 
 /**

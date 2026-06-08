@@ -7,6 +7,8 @@ import {
   truncated,
   text,
   errorResult,
+  pgnOrJson,
+  capText,
 } from "../format.js";
 
 // All tools are read-only and talk to an external API.
@@ -69,6 +71,36 @@ function formatPuzzle(data: lichess.LichessPuzzle): string {
   ].join("\n");
 }
 
+const EXPLORER_MOVE_CAP = 12;
+
+// Coerce a possibly-missing count to a number so a malformed payload renders 0
+// instead of NaN/undefined.
+const num = (v: number | undefined): number => (typeof v === "number" ? v : 0);
+
+export function formatOpeningExplorer(d: lichess.ExplorerResult): string {
+  const white = num(d.white);
+  const draws = num(d.draws);
+  const black = num(d.black);
+  const total = white + draws + black;
+  const lines: string[] = [];
+  if (d.opening) lines.push(`Opening: ${d.opening.name} (${d.opening.eco})`);
+  lines.push(`Total games: ${total} (W ${white} / D ${draws} / B ${black})`);
+  if (!d.moves || d.moves.length === 0) {
+    lines.push("No moves in this database for the position.");
+    return lines.join("\n");
+  }
+  lines.push("Top moves:");
+  for (const m of d.moves.slice(0, EXPLORER_MOVE_CAP)) {
+    const games = num(m.white) + num(m.draws) + num(m.black);
+    const rating = m.averageRating ?? m.averageOpponentRating;
+    const ratingStr = rating !== undefined ? `, avg ${rating}` : "";
+    lines.push(
+      `  ${m.san}: ${games} games (W ${num(m.white)}/D ${num(m.draws)}/B ${num(m.black)}${ratingStr})`,
+    );
+  }
+  return lines.join("\n");
+}
+
 const TABLEBASE_MOVE_CAP = 12;
 
 export function formatTablebase(d: lichess.TablebaseResult): string {
@@ -91,6 +123,169 @@ export function formatTablebase(d: lichess.TablebaseResult): string {
     const mdtz = m.dtz != null ? `, DTZ ${m.dtz}` : "";
     const mdtm = m.dtm != null ? `, DTM ${m.dtm}` : "";
     lines.push(`  ${m.san}:${cat}${mdtz}${mdtm}`);
+  }
+  return lines.join("\n");
+}
+
+/** One-line rating summary from a FIDE player's present rating fields. */
+function fideRatings(p: lichess.FidePlayer): string {
+  const parts: string[] = [];
+  if (p.standard !== undefined) parts.push(`standard ${p.standard}`);
+  if (p.rapid !== undefined) parts.push(`rapid ${p.rapid}`);
+  if (p.blitz !== undefined) parts.push(`blitz ${p.blitz}`);
+  return parts.join(", ");
+}
+
+export function formatFidePlayer(p: lichess.FidePlayer): string {
+  const lines: string[] = [`Name: ${p.name}`, `FIDE ID: ${p.id}`];
+  if (p.federation) lines.push(`Federation: ${p.federation}`);
+  if (p.title) lines.push(`Title: ${p.title}`);
+  if (p.year !== undefined) lines.push(`Born: ${p.year}`);
+  const ratings = fideRatings(p);
+  lines.push(`Ratings: ${ratings || "none on record"}`);
+  return lines.join("\n");
+}
+
+const FIDE_SEARCH_CAP = 50;
+
+export function formatFideSearch(players: lichess.FidePlayer[]): string {
+  if (players.length === 0) return "No FIDE players found.";
+  const shown = players.slice(0, FIDE_SEARCH_CAP);
+  const lines = shown.map((p) => {
+    const meta = [p.title, p.federation].filter(Boolean).join(", ");
+    const std = p.standard !== undefined ? `, std ${p.standard}` : "";
+    return `- ${p.name} (FIDE ${p.id}${meta ? `, ${meta}` : ""}${std})`;
+  });
+  const note =
+    players.length > FIDE_SEARCH_CAP
+      ? `\n… ${players.length - FIDE_SEARCH_CAP} more not shown`
+      : "";
+  return `Found ${players.length} FIDE players.\n${lines.join("\n")}${note}`;
+}
+
+export function formatAutocomplete(
+  players: lichess.AutocompletePlayer[],
+): string {
+  if (players.length === 0) return "No matching players.";
+  const names = players
+    .map((p) => `${p.title ? `${p.title} ` : ""}${p.name}`)
+    .join(", ");
+  return `Found ${players.length} matching players:\n${names}`;
+}
+
+/** Compact one-line-per-user summary for the bulk users lookup (#43). */
+export function formatUsersBulk(users: lichess.LichessUser[]): string {
+  if (users.length === 0) return "No users found.";
+  const lines = users.map((u) => {
+    const title = u.title ? `${u.title} ` : "";
+    const perfs = u.perfs ?? {};
+    const ratings = ["bullet", "blitz", "rapid", "classical"]
+      .filter((k) => perfs[k])
+      .map((k) => `${k} ${perfs[k].rating}`)
+      .join(", ");
+    const games = u.count ? ` (${u.count.all} games)` : "";
+    return `${title}${u.username}${ratings ? ` — ${ratings}` : ""}${games}`;
+  });
+  return `Found ${users.length} users:\n${lines.join("\n")}`;
+}
+
+// Char budget for raw PGN output so a whole-event export can't blow the window.
+const PGN_MAX_CHARS = 50_000;
+
+function capPgn(pgn: string): string {
+  return pgn.length <= PGN_MAX_CHARS
+    ? pgn
+    : pgn.slice(0, PGN_MAX_CHARS) +
+        `\n… truncated (${pgn.length - PGN_MAX_CHARS} more characters not shown)`;
+}
+
+export function formatSwiss(s: lichess.SwissInfo): string {
+  const lines = [
+    `Name: ${s.name}`,
+    `ID: ${s.id}`,
+    `Status: ${s.status}`,
+    `Variant: ${s.variant}`,
+    `Rounds: ${s.round}/${s.nbRounds}`,
+    `Players: ${s.nbPlayers}`,
+  ];
+  if (s.clock) lines.push(`Clock: ${s.clock.limit / 60}+${s.clock.increment}`);
+  if (s.startsAt) lines.push(`Starts: ${s.startsAt}`);
+  if (s.createdBy) lines.push(`Created by: ${s.createdBy}`);
+  return lines.join("\n");
+}
+
+/** Shared standings renderer for Swiss and Arena results (#37, #41). */
+export function formatStandings(rows: lichess.StandingRow[]): string {
+  if (rows.length === 0) return "No results available.";
+  const lines = rows.map((r) => {
+    const score = r.points ?? r.score;
+    const rating = r.rating !== undefined ? ` (${r.rating})` : "";
+    const pts = score !== undefined ? ` — ${score} pts` : "";
+    const perf = r.performance !== undefined ? `, perf ${r.performance}` : "";
+    const title = r.title ? `${r.title} ` : "";
+    return `${r.rank}. ${title}${r.username}${rating}${pts}${perf}`;
+  });
+  return `${rows.length} players:\n${lines.join("\n")}`;
+}
+
+const SIMUL_LIST_CAP = 20;
+
+export function formatSimuls(data: lichess.SimulsResponse): string {
+  const summary = [
+    `Created: ${data.created?.length ?? 0}`,
+    `Started: ${data.started?.length ?? 0}`,
+    `Finished: ${data.finished?.length ?? 0}`,
+  ].join("\n");
+  const active = [...(data.started ?? []), ...(data.created ?? [])].slice(
+    0,
+    SIMUL_LIST_CAP,
+  );
+  if (active.length === 0) return `${summary}\n\nNo active simuls.`;
+  const lines = active.map((s) => {
+    const applicants =
+      s.nbApplicants !== undefined ? ` (${s.nbApplicants} applicants)` : "";
+    return `- ${s.fullName} by ${s.host?.name}${applicants}`;
+  });
+  return `${summary}\n\nActive simuls:\n${lines.join("\n")}`;
+}
+
+export function formatStudies(studies: lichess.StudyMetadata[]): string {
+  if (studies.length === 0) return "No public studies found.";
+  const lines = studies.map((s) => {
+    const updated =
+      s.updatedAt !== undefined ? ` — updated ${toISOString(s.updatedAt)}` : "";
+    return `- ${s.name} (${s.id})${updated}`;
+  });
+  return `Found ${studies.length} studies:\n${lines.join("\n")}`;
+}
+
+export function formatBroadcasts(items: lichess.BroadcastEntry[]): string {
+  if (items.length === 0) return "No broadcasts found.";
+  const lines = items.map((b) => {
+    const rounds = b.rounds?.length ?? 0;
+    const def = b.defaultRoundId ? `, default round ${b.defaultRoundId}` : "";
+    return `- ${b.tour?.name ?? "(unnamed)"} (${rounds} rounds${def})`;
+  });
+  return `Found ${items.length} broadcasts:\n${lines.join("\n")}`;
+}
+
+const TOP_BROADCAST_CAP = 15;
+
+export function formatTopBroadcasts(data: lichess.TopBroadcasts): string {
+  const active = data.active ?? [];
+  const upcoming = data.upcoming ?? [];
+  const past = data.past ?? [];
+  const lines = [
+    `Active: ${active.length}`,
+    `Upcoming: ${upcoming.length}`,
+    `Past: ${past.length}`,
+  ];
+  if (active.length > 0) {
+    lines.push("", "Active broadcasts:");
+    for (const b of active.slice(0, TOP_BROADCAST_CAP)) {
+      const round = b.round?.name ? ` — ${b.round.name}` : "";
+      lines.push(`- ${b.tour?.name ?? "(unnamed)"}${round}`);
+    }
   }
   return lines.join("\n");
 }
@@ -280,25 +475,55 @@ export function registerLichessTools(server: McpServer): void {
           .boolean()
           .optional()
           .describe("Include opening information (default true)"),
+        format: z
+          .enum(["json", "pgn"])
+          .optional()
+          .describe(
+            "Output format: 'json' (default) or 'pgn' for raw PGN ready for engine analysis",
+          ),
       },
     },
-    ({ username, max, rated, perfType, color, since, until, opening }) =>
-      call(
+    ({
+      username,
+      max,
+      rated,
+      perfType,
+      color,
+      since,
+      until,
+      opening,
+      format,
+    }) => {
+      const asPgn = format === "pgn";
+      return call(
         () =>
-          lichess.getUserGames(username, {
-            max: max ?? 10,
-            rated,
-            perfType,
-            color,
-            since,
-            until,
-            opening: opening ?? true,
-          }),
-        (games) =>
-          games.length === 0
+          lichess.getUserGames(
+            username,
+            {
+              max: max ?? 10,
+              rated,
+              perfType,
+              color,
+              since,
+              until,
+              opening: opening ?? true,
+            },
+            asPgn,
+          ),
+        (data) => {
+          if (asPgn) {
+            const pgn = String(data).trim();
+            return pgn === ""
+              ? `No games found for ${username}.`
+              : capText(pgn);
+          }
+          const games = data as unknown[];
+          return games.length === 0
             ? `No games found for ${username}.`
-            : `Found ${games.length} games for ${username}.\n\n${jsonBlock(games)}`,
-      ),
+            : `Found ${games.length} games for ${username}.\n\n${jsonBlock(games)}`;
+        },
+      );
+    },
   );
 
   server.registerTool(
@@ -307,12 +532,22 @@ export function registerLichessTools(server: McpServer): void {
       annotations: READ_ONLY_HINTS,
       title: "Lichess: Get Game by ID",
       description:
-        "Get a specific Lichess game by its 8-character game ID. Returns full game data including moves, clocks, and analysis.",
+        "Get a specific Lichess game by its 8-character game ID. Returns full game data including moves, clocks, and analysis, as JSON or raw PGN.",
       inputSchema: {
         game_id: z.string().describe("Lichess game ID (8 characters)"),
+        format: z
+          .enum(["json", "pgn"])
+          .optional()
+          .describe(
+            "Output format: 'json' (default) or 'pgn' for raw PGN ready for engine analysis",
+          ),
       },
     },
-    ({ game_id }) => call(() => lichess.getGameById(game_id), jsonBlock),
+    ({ game_id, format }) =>
+      call(
+        () => lichess.getGameById(game_id, format === "pgn"),
+        (d) => pgnOrJson(d, format === "pgn"),
+      ),
   );
 
   server.registerTool(
@@ -688,6 +923,414 @@ export function registerLichessTools(server: McpServer): void {
     ({ fen }) => call(() => lichess.getCloudEval(fen), jsonBlock),
   );
 
+  // ── FIDE players ───────────────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_get_fide_player",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: FIDE Player",
+      description:
+        "Look up a FIDE player by their numeric FIDE ID. Returns name, federation, title, birth year, and standard/rapid/blitz ratings.",
+      inputSchema: {
+        player_id: z
+          .number()
+          .int()
+          .positive()
+          .describe("Numeric FIDE player ID (e.g. 1503014 for Magnus Carlsen)"),
+      },
+    },
+    ({ player_id }) =>
+      call(() => lichess.getFidePlayer(player_id), formatFidePlayer),
+  );
+
+  server.registerTool(
+    "lichess_search_fide_players",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Search FIDE Players",
+      description:
+        "Search FIDE players by name. Returns matching players with their FIDE IDs, titles, federations, and standard ratings.",
+      inputSchema: {
+        query: z.string().min(1).describe("Player name to search for"),
+      },
+    },
+    ({ query }) =>
+      call(() => lichess.searchFidePlayers(query), formatFideSearch),
+  );
+
+  // ── Player autocomplete ────────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_autocomplete_players",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Autocomplete Players",
+      description:
+        "Resolve or disambiguate Lichess usernames from a partial term — useful before calling user tools. Returns up to ~10 matching usernames with titles.",
+      inputSchema: {
+        term: z
+          .string()
+          .min(3)
+          .describe("Partial username (at least 3 characters)"),
+      },
+    },
+    ({ term }) =>
+      call(
+        () => lichess.autocompletePlayers(term),
+        (d) => formatAutocomplete(d.result),
+      ),
+  );
+
+  // ── Bulk endpoints ─────────────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_export_games_by_ids",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Export Games by IDs",
+      description:
+        "Export multiple Lichess games at once by their IDs (one round-trip). Returns JSON by default, or raw PGN with format=pgn.",
+      inputSchema: {
+        game_ids: z
+          .array(z.string())
+          .min(1)
+          .max(100)
+          .describe("Lichess game IDs (1-100)"),
+        format: z
+          .enum(["json", "pgn"])
+          .optional()
+          .describe("Output format: 'json' (default) or 'pgn'"),
+      },
+    },
+    ({ game_ids, format }) => {
+      const asPgn = format === "pgn";
+      return call(
+        () => lichess.exportGamesByIds(game_ids, asPgn),
+        (data) => {
+          if (asPgn) {
+            const pgn = String(data).trim();
+            return pgn === ""
+              ? "No games found for the given IDs."
+              : capText(pgn);
+          }
+          const games = data as unknown[];
+          return games.length === 0
+            ? "No games found for the given IDs."
+            : `Found ${games.length} games.\n\n${jsonBlock(games)}`;
+        },
+      );
+    },
+  );
+
+  server.registerTool(
+    "lichess_get_users",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Get Users by IDs",
+      description:
+        "Fetch multiple Lichess users at once by their usernames (one round-trip). Returns a compact per-user rating summary.",
+      inputSchema: {
+        usernames: z
+          .array(z.string())
+          .min(1)
+          .max(300)
+          .describe("Lichess usernames (1-300)"),
+      },
+    },
+    ({ usernames }) =>
+      call(() => lichess.getUsersByIds(usernames), formatUsersBulk),
+  );
+
+  // ── Swiss tournaments ──────────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_get_swiss",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Get Swiss Tournament",
+      description:
+        "Get information about a Lichess Swiss tournament: name, status, variant, rounds, clock, and player count.",
+      inputSchema: {
+        swiss_id: z.string().describe("Lichess Swiss tournament ID"),
+      },
+    },
+    ({ swiss_id }) => call(() => lichess.getSwiss(swiss_id), formatSwiss),
+  );
+
+  server.registerTool(
+    "lichess_get_swiss_results",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Swiss Results",
+      description:
+        "Get the final standings of a Lichess Swiss tournament with rank, points, rating, and performance (top 100).",
+      inputSchema: {
+        swiss_id: z.string().describe("Lichess Swiss tournament ID"),
+      },
+    },
+    ({ swiss_id }) =>
+      call(() => lichess.getSwissResults(swiss_id), formatStandings),
+  );
+
+  server.registerTool(
+    "lichess_get_swiss_games",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Swiss Games",
+      description:
+        "Export the games of a Lichess Swiss tournament. JSON by default, or raw PGN with format=pgn. Bounded for large events.",
+      inputSchema: {
+        swiss_id: z.string().describe("Lichess Swiss tournament ID"),
+        format: z
+          .enum(["json", "pgn"])
+          .optional()
+          .describe("Output format: 'json' (default) or 'pgn'"),
+      },
+    },
+    ({ swiss_id, format }) => {
+      const asPgn = format === "pgn";
+      return call(
+        () => lichess.getSwissGames(swiss_id, asPgn),
+        (data) => renderGames(data, asPgn),
+      );
+    },
+  );
+
+  // ── Arena tournaments (results + games) ─────────────────────────────
+
+  server.registerTool(
+    "lichess_get_tournament_results",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Arena Results",
+      description:
+        "Get the final standings of a Lichess Arena tournament with rank, score, rating, and performance (top 100).",
+      inputSchema: {
+        tournament_id: z.string().describe("Lichess Arena tournament ID"),
+      },
+    },
+    ({ tournament_id }) =>
+      call(() => lichess.getArenaResults(tournament_id), formatStandings),
+  );
+
+  server.registerTool(
+    "lichess_get_tournament_games",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Arena Games",
+      description:
+        "Export the games of a Lichess Arena tournament. JSON by default, or raw PGN with format=pgn. Bounded for large events.",
+      inputSchema: {
+        tournament_id: z.string().describe("Lichess Arena tournament ID"),
+        format: z
+          .enum(["json", "pgn"])
+          .optional()
+          .describe("Output format: 'json' (default) or 'pgn'"),
+      },
+    },
+    ({ tournament_id, format }) => {
+      const asPgn = format === "pgn";
+      return call(
+        () => lichess.getArenaGames(tournament_id, asPgn),
+        (data) => renderGames(data, asPgn),
+      );
+    },
+  );
+
+  // ── Simuls ─────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_get_simuls",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Simuls",
+      description:
+        "Get current Lichess simultaneous exhibitions (simuls), grouped by created/started/finished.",
+      inputSchema: {},
+    },
+    () => call(() => lichess.getSimuls(), formatSimuls),
+  );
+
+  // ── Studies ────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_get_user_studies",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: User's Studies",
+      description:
+        "List a Lichess user's public studies (metadata: name, id, updated date). Use the id with the study PGN export tools.",
+      inputSchema: {
+        username: z.string().describe("Lichess username"),
+      },
+    },
+    ({ username }) =>
+      call(() => lichess.getUserStudies(username), formatStudies),
+  );
+
+  server.registerTool(
+    "lichess_export_study_pgn",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Export Study PGN",
+      description:
+        "Export an entire public Lichess study as PGN (all chapters), ready for engine/repertoire analysis.",
+      inputSchema: {
+        study_id: z.string().describe("Lichess study ID (8 characters)"),
+      },
+    },
+    ({ study_id }) => call(() => lichess.exportStudyPgn(study_id), capPgn),
+  );
+
+  server.registerTool(
+    "lichess_export_study_chapter_pgn",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Export Study Chapter PGN",
+      description:
+        "Export a single chapter of a public Lichess study as PGN. The chapter ID comes from the chapter's URL (lichess.org/study/{studyId}/{chapterId}).",
+      inputSchema: {
+        study_id: z.string().describe("Lichess study ID (8 characters)"),
+        chapter_id: z.string().describe("Study chapter ID (8 characters)"),
+      },
+    },
+    ({ study_id, chapter_id }) =>
+      call(() => lichess.exportStudyChapterPgn(study_id, chapter_id), capPgn),
+  );
+
+  // ── Broadcasts / live relays ────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_get_broadcasts",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Broadcasts",
+      description:
+        "Get the index of official Lichess broadcasts (live tournament relays) with their rounds and default round id.",
+      inputSchema: {},
+    },
+    () => call(() => lichess.getBroadcasts(), formatBroadcasts),
+  );
+
+  server.registerTool(
+    "lichess_get_top_broadcasts",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Top Broadcasts",
+      description:
+        "Get featured Lichess broadcasts grouped into active, upcoming, and past.",
+      inputSchema: {},
+    },
+    () => call(() => lichess.getTopBroadcasts(), formatTopBroadcasts),
+  );
+
+  server.registerTool(
+    "lichess_get_broadcasts_by_user",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Broadcasts by User",
+      description:
+        "Get the broadcasts created by a specific Lichess user (most recent first).",
+      inputSchema: {
+        username: z.string().describe("Lichess username (broadcast creator)"),
+      },
+    },
+    ({ username }) =>
+      call(
+        () => lichess.getBroadcastsByUser(username),
+        (d) => formatBroadcasts(d.currentPageResults ?? []),
+      ),
+  );
+
+  server.registerTool(
+    "lichess_get_broadcast_round_pgn",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Broadcast Round PGN",
+      description:
+        "Get a broadcast round's games as PGN (the live game feed; updates during play). The round id comes from the broadcast index.",
+      inputSchema: {
+        round_id: z.string().describe("Broadcast round ID (8 characters)"),
+      },
+    },
+    ({ round_id }) =>
+      call(() => lichess.getBroadcastRoundPgn(round_id), capPgn),
+  );
+
+  // ── Opening Explorer ────────────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_opening_explorer",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Opening Explorer",
+      description:
+        "Look up a position in the Lichess Opening Explorer. db=masters (OTB master games), lichess (Lichess games, filterable by speeds/ratings), or player (a specific user's games — requires player and color). Returns the opening name, win/draw/loss totals, and the most common next moves.",
+      inputSchema: {
+        db: z
+          .enum(["masters", "lichess", "player"])
+          .describe("Which database to query"),
+        fen: z.string().describe("FEN of the position to look up"),
+        play: z
+          .string()
+          .optional()
+          .describe(
+            "Comma-separated UCI moves from the FEN (alternative drill-down)",
+          ),
+        variant: z
+          .string()
+          .optional()
+          .describe(
+            "Variant for the lichess/player db (e.g. standard, chess960)",
+          ),
+        speeds: z
+          .string()
+          .optional()
+          .describe(
+            "Comma-separated speeds for lichess/player db (e.g. blitz,rapid)",
+          ),
+        ratings: z
+          .string()
+          .optional()
+          .describe(
+            "Comma-separated rating bands for the lichess db (e.g. 2000,2200)",
+          ),
+        player: z
+          .string()
+          .optional()
+          .describe("Username — required when db=player"),
+        color: z
+          .enum(["white", "black"])
+          .optional()
+          .describe("Side the player had — used with db=player"),
+        moves: z
+          .number()
+          .int()
+          .min(1)
+          .max(30)
+          .optional()
+          .describe("Number of next moves to return (default upstream)"),
+      },
+    },
+    ({ db, fen, play, variant, speeds, ratings, player, color, moves }) =>
+      call(
+        () =>
+          lichess.openingExplorer({
+            db,
+            fen,
+            play,
+            variant,
+            speeds,
+            ratings,
+            player,
+            color,
+            moves,
+          }),
+        formatOpeningExplorer,
+      ),
+  );
+
   // ── Tablebase ───────────────────────────────────────────────────────
 
   server.registerTool(
@@ -707,4 +1350,16 @@ export function registerLichessTools(server: McpServer): void {
     ({ variant, fen }) =>
       call(() => lichess.tablebaseLookup(variant, fen), formatTablebase),
   );
+}
+
+/** Shared json/pgn renderer for the tournament game-export tools (#37, #41). */
+function renderGames(data: unknown[] | string, asPgn: boolean): string {
+  if (asPgn) {
+    const pgn = String(data).trim();
+    return pgn === "" ? "No games found for this tournament." : capPgn(pgn);
+  }
+  const games = data as unknown[];
+  return games.length === 0
+    ? "No games found for this tournament."
+    : `Found ${games.length} games.\n\n${jsonBlock(games)}`;
 }
