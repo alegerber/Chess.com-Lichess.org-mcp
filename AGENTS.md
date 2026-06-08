@@ -14,11 +14,11 @@ src/
 ├── lichess-api.ts    # Lichess API client — typed fetch wrappers (JSON + NDJSON streaming)
 └── tools/
     ├── chess.ts      # Registers the 29 Chess.com tools (+ their formatters)
-    └── lichess.ts    # Registers the 45 Lichess tools (+ their formatters)
+    └── lichess.ts    # Registers the 44–45 Lichess tools (+ their formatters)
 ```
 
 - **`index.ts`** is the bootstrap. It creates an `McpServer`, calls `registerChessTools(server)` and `registerLichessTools(server)`, and connects via `StdioServerTransport`. The tool registrations live in `src/tools/`, not here.
-- **`src/tools/chess.ts` / `src/tools/lichess.ts`** register the 74 tools (29 Chess.com + 45 Lichess) via `server.registerTool()` and hold each tool's formatter. Handlers wrap their API call in a local `call(fn, format)` helper so failures are returned as tagged error results.
+- **`src/tools/chess.ts` / `src/tools/lichess.ts`** register the 73–74 tools (29 Chess.com + 44–45 Lichess) via `server.registerTool()` and hold each tool's formatter. Handlers wrap their API call in a local `call(fn, format)` helper so failures are returned as tagged error results. The count is conditional: `lichess_get_user_teams` is registered only when the optional `LICHESS_TOKEN` env var is set (#30), so the default is 73 and a token adds the one OAuth-only tool. `lichessAuthHeader()` attaches `Authorization: Bearer` to `lichess.org` requests only — never to the explorer/tablebase hosts.
 - **`format.ts`** holds shared, dependency-free helpers: `jsonBlock` (size-capped JSON), `truncated`, `toISOString`, `text` (the tool envelope with an `isError` flag), `errorResult` (maps thrown errors to tagged results), and `parseNdjson`.
 - **`chess-api.ts`** wraps the Chess.com Published-Data API (`https://api.chess.com/pub/...`). All responses are JSON.
 - **`lichess-api.ts`** wraps the Lichess API (`https://lichess.org/...`). Some endpoints return NDJSON — handled by `fetchNdjson()`, which streams line-by-line (with a line cap for unbounded endpoints).

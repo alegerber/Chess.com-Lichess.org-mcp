@@ -5,11 +5,23 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../src/server.js";
 
 // In-process: no child process, no network. Exercises real registration +
-// the MCP handshake / tools/list output.
-async function connectedClient(): Promise<Client> {
+// the MCP handshake / tools/list output. createServer() reads LICHESS_TOKEN at
+// build time to decide which tools to register (#30), so set/clear it around
+// construction to keep tests deterministic regardless of the ambient env.
+async function connectedClient(token?: string): Promise<Client> {
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
-  const server = createServer();
+  const prev = process.env.LICHESS_TOKEN;
+  if (token === undefined) delete process.env.LICHESS_TOKEN;
+  else process.env.LICHESS_TOKEN = token;
+  let server: ReturnType<typeof createServer>;
+  try {
+    server = createServer();
+  } finally {
+    // The server captured its tool list synchronously; restore env immediately.
+    if (prev === undefined) delete process.env.LICHESS_TOKEN;
+    else process.env.LICHESS_TOKEN = prev;
+  }
   const client = new Client({ name: "test", version: "1.0.0" });
   await Promise.all([
     server.connect(serverTransport),
@@ -19,9 +31,10 @@ async function connectedClient(): Promise<Client> {
 }
 
 test("every tool is annotated read-only and open-world (L3)", async () => {
+  // Default, token-less experience: the OAuth-only tool (#30) is omitted.
   const client = await connectedClient();
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 74);
+  assert.equal(tools.length, 73);
   for (const t of tools) {
     assert.equal(t.annotations?.readOnlyHint, true, `${t.name}: readOnlyHint`);
     assert.equal(t.annotations?.openWorldHint, true, `${t.name}: openWorldHint`);
@@ -37,32 +50,27 @@ test("server exposes instructions (L4)", async () => {
   await client.close();
 });
 
-// Lichess made GET /api/team/of OAuth-only (security: - OAuth2: []), so this
-// auth-less server can never satisfy it. Interim: flag the requirement in the
-// description and return a clear error instead of a doomed request (#31).
-test("lichess_get_user_teams is flagged auth-required and returns an explanatory error (#31)", async () => {
-  const client = await connectedClient();
-
-  // The description flags the OAuth requirement before the tool is ever called.
+// Lichess made GET /api/team/of OAuth-only (security: - OAuth2: []). Rather than
+// ship a guaranteed-failing tool, we register it only when an optional
+// LICHESS_TOKEN is configured (#30), keeping the zero-config default public-only.
+test("lichess_get_user_teams is absent without a LICHESS_TOKEN (#30)", async () => {
+  const client = await connectedClient(); // no token
   const { tools } = await client.listTools();
+  assert.equal(tools.length, 73);
+  assert.equal(
+    tools.find((t) => t.name === "lichess_get_user_teams"),
+    undefined,
+    "OAuth-only tool is omitted when no token is configured",
+  );
+  await client.close();
+});
+
+test("lichess_get_user_teams is registered with a LICHESS_TOKEN (#30)", async () => {
+  const client = await connectedClient("lip_test_token");
+  const { tools } = await client.listTools();
+  assert.equal(tools.length, 74);
   const tool = tools.find((t) => t.name === "lichess_get_user_teams");
-  assert.ok(tool, "lichess_get_user_teams is registered");
-  assert.match(tool.description ?? "", /oauth|token/i, "description flags auth");
-
-  // Calling it returns a clear isError message (no network round-trip).
-  const res = await client.callTool({
-    name: "lichess_get_user_teams",
-    arguments: { username: "anyone" },
-  });
-  const content = (res.content ?? []) as Array<{ type: string; text?: string }>;
-  const body = content
-    .filter((c) => c.type === "text")
-    .map((c) => c.text ?? "")
-    .join("\n");
-  assert.equal(res.isError, true);
-  assert.match(body, /oauth|token|unavailable/i);
-  // Points users to the public alternatives that still work.
-  assert.match(body, /lichess_search_teams|lichess_get_team_members/);
-
+  assert.ok(tool, "OAuth-only tool is registered when a token is present");
+  assert.match(tool.description ?? "", /team/i);
   await client.close();
 });
