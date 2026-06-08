@@ -339,6 +339,71 @@ export function formatTopBroadcasts(data: lichess.TopBroadcasts): string {
   return lines.join("\n");
 }
 
+// Human-readable lifecycle of a broadcast round (#59), shared by the tournament
+// and round formatters.
+function broadcastRoundStatus(r: lichess.BroadcastRoundInfo): string {
+  if (r.ongoing) return "live";
+  if (r.finished)
+    return r.finishedAt ? `finished ${toISOString(r.finishedAt)}` : "finished";
+  if (r.startsAt) return `starts ${toISOString(r.startsAt)}`;
+  return "scheduled";
+}
+
+export function formatBroadcastTournament(
+  d: lichess.BroadcastTournament,
+): string {
+  const t = d.tour;
+  const lines: string[] = [t.name, `ID: ${t.id}`];
+  const info = t.info ?? {};
+  const meta = [
+    info.format && `Format: ${info.format}`,
+    info.tc && `Time control: ${info.tc}`,
+    info.location && `Location: ${info.location}`,
+    info.players && `Players: ${info.players}`,
+  ].filter(Boolean);
+  if (meta.length > 0) lines.push(meta.join(" | "));
+
+  const rounds = d.rounds ?? [];
+  lines.push(`Rounds (${rounds.length}):`);
+  if (rounds.length === 0) {
+    lines.push("No rounds yet.");
+  } else {
+    for (const r of rounds) {
+      lines.push(`- ${r.name} (${r.id}) — ${broadcastRoundStatus(r)}`);
+    }
+  }
+  if (d.defaultRoundId) lines.push(`Default round: ${d.defaultRoundId}`);
+  return lines.join("\n");
+}
+
+// A round can have dozens of boards; cap the listing like the other list tools.
+const BROADCAST_GAMES_CAP = 30;
+
+// "*" (or a missing status) means the game is still in progress.
+function broadcastGameResult(g: lichess.BroadcastGame): string {
+  return !g.status || g.status === "*" ? "ongoing" : g.status;
+}
+
+export function formatBroadcastRound(d: lichess.BroadcastRound): string {
+  const lines: string[] = [
+    `${d.tour.name} — ${d.round.name} (${d.round.id})`,
+    `Status: ${broadcastRoundStatus(d.round)}`,
+  ];
+  const games = d.games ?? [];
+  if (games.length === 0) {
+    lines.push("No games in this round.");
+    return lines.join("\n");
+  }
+  lines.push(`Games (${games.length}):`);
+  for (const g of games.slice(0, BROADCAST_GAMES_CAP)) {
+    lines.push(`- ${g.name} — ${broadcastGameResult(g)}`);
+  }
+  if (games.length > BROADCAST_GAMES_CAP) {
+    lines.push(`… ${games.length - BROADCAST_GAMES_CAP} more games not shown`);
+  }
+  return lines.join("\n");
+}
+
 // ─── Error handler ─────────────────────────────────────────────────
 
 export async function call<T>(fn: () => Promise<T>, format: (d: T) => string) {
@@ -1379,6 +1444,64 @@ export function registerLichessTools(server: McpServer): void {
     },
     ({ round_id }) =>
       call(() => lichess.getBroadcastRoundPgn(round_id), capPgn),
+  );
+
+  server.registerTool(
+    "lichess_get_broadcast",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Broadcast Tournament",
+      description:
+        "Get a broadcast tournament's metadata and its rounds (with each round's id, status, and the default round id). The tournament id comes from the broadcast index.",
+      inputSchema: {
+        tournament_id: z
+          .string()
+          .describe("Broadcast tournament ID (8 characters)"),
+      },
+    },
+    ({ tournament_id }) =>
+      call(
+        () => lichess.getBroadcast(tournament_id),
+        formatBroadcastTournament,
+      ),
+  );
+
+  server.registerTool(
+    "lichess_get_broadcast_round",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Broadcast Round",
+      description:
+        "Get a broadcast round as JSON: its games, players, and results (complements the PGN feed). The round id comes from the broadcast index or lichess_get_broadcast.",
+      inputSchema: {
+        round_id: z.string().describe("Broadcast round ID (8 characters)"),
+      },
+    },
+    ({ round_id }) =>
+      call(() => lichess.getBroadcastRound(round_id), formatBroadcastRound),
+  );
+
+  server.registerTool(
+    "lichess_get_broadcast_pgn",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Broadcast PGN",
+      description:
+        "Get every round's games of a broadcast tournament as a single PGN (size-capped). For one round's live feed use lichess_get_broadcast_round_pgn.",
+      inputSchema: {
+        tournament_id: z
+          .string()
+          .describe("Broadcast tournament ID (8 characters)"),
+      },
+    },
+    ({ tournament_id }) =>
+      call(
+        () => lichess.getBroadcastPgn(tournament_id),
+        (pgn) =>
+          pgn.trim() === ""
+            ? "No games found for this broadcast."
+            : capPgn(pgn),
+      ),
   );
 
   // ── Opening Explorer ────────────────────────────────────────────────
