@@ -20,12 +20,34 @@ const STREAM_TIMEOUT_MS = 30_000;
 /** Media type Lichess uses for raw PGN responses on game/export endpoints. */
 export const PGN_MEDIA_TYPE = "application/x-chess-pgn";
 
+/**
+ * Optional OAuth bearer for lichess.org requests (#30). Some endpoints (e.g.
+ * GET /api/team/of) are no longer public; when LICHESS_TOKEN is set we attach
+ * `Authorization: Bearer <token>`. Read at call time so the value can be
+ * toggled (e.g. in tests). Returns an empty object when unset, so spreading it
+ * into a headers literal is a no-op in the default, auth-less configuration.
+ *
+ * Intentionally applied ONLY to lichess.org callers — never to the separate
+ * explorer.lichess.ovh / tablebase.lichess.ovh hosts, which need no auth, so
+ * the token is never sent to a host that doesn't require it.
+ */
+export function lichessAuthHeader(): Record<string, string> {
+  const token = process.env.LICHESS_TOKEN?.trim();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** True when an optional Lichess OAuth token is configured (#30). */
+export function hasLichessToken(): boolean {
+  return !!process.env.LICHESS_TOKEN?.trim();
+}
+
 async function fetchJson<T>(path: string): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const response = await fetch(url, {
     headers: {
       "User-Agent": USER_AGENT,
       Accept: "application/json",
+      ...lichessAuthHeader(),
     },
     signal: AbortSignal.timeout(JSON_TIMEOUT_MS),
   });
@@ -51,6 +73,7 @@ async function fetchText(path: string, accept: string): Promise<string> {
     headers: {
       "User-Agent": USER_AGENT,
       Accept: accept,
+      ...lichessAuthHeader(),
     },
     signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
   });
@@ -96,6 +119,7 @@ async function fetchNdjson<T>(path: string, maxLines?: number): Promise<T[]> {
     headers: {
       "User-Agent": USER_AGENT,
       Accept: "application/x-ndjson",
+      ...lichessAuthHeader(),
     },
     signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
   });
@@ -144,6 +168,7 @@ async function fetchTextBounded(
     headers: {
       "User-Agent": USER_AGENT,
       Accept: accept,
+      ...lichessAuthHeader(),
     },
     signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
   });
@@ -192,6 +217,7 @@ async function postText(
       "User-Agent": USER_AGENT,
       Accept: accept,
       "Content-Type": "text/plain",
+      ...lichessAuthHeader(),
     },
     body,
     signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
@@ -401,9 +427,10 @@ export function searchTeams(text: string, page: number = 1): Promise<unknown> {
   );
 }
 
-// Currently unused: /api/team/of is OAuth-only, so the tool returns a clear
-// message instead of calling this (#31). Wired back up with token support (#30).
-export function getUserTeams(username: string): Promise<unknown[]> {
+// /api/team/of is OAuth-only; the lichess_get_user_teams tool is registered
+// only when a LICHESS_TOKEN is configured (#30), which lichessAuthHeader() then
+// attaches to this request.
+export function getUserTeams(username: string): Promise<LichessTeam[]> {
   return fetchJson(`/api/team/of/${encodeURIComponent(username)}`);
 }
 

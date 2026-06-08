@@ -38,7 +38,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `get_streamers` | List Chess.com streamers |
 | `get_leaderboards` | Get leaderboards for all game types |
 
-### Lichess (45 tools)
+### Lichess (44 tools, +1 with `LICHESS_TOKEN`)
 
 | Tool | Description |
 |------|-------------|
@@ -57,7 +57,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `lichess_get_storm_dashboard` | Get a user's Puzzle Storm statistics |
 | `lichess_get_team` | Get a team's profile, description, and member count |
 | `lichess_search_teams` | Search for teams by name |
-| `lichess_get_user_teams` | Get all teams a user is a member of — _requires a Lichess OAuth token (`/api/team/of` is no longer public); this auth-less server returns an explanatory error. Token support planned ([#30](https://github.com/alegerber/chess-com-lichess-org-mcp/issues/30))_ |
+| `lichess_get_user_teams` | Get all teams a user is a member of — _registered only when [`LICHESS_TOKEN`](#optional-lichess-oauth-token) is set, since `/api/team/of` is OAuth-only_ |
 | `lichess_get_team_members` | Get the members of a Lichess team |
 | `lichess_get_current_tournaments` | Get the current tournament schedule |
 | `lichess_get_tournament` | Get details about a specific arena tournament |
@@ -121,6 +121,27 @@ npm run build
 ```
 
 Then point the MCP config at the built entry point — `command: node`, `args: ["/absolute/path/to/chess-com-lichess-org-mcp/dist/index.js"]`.
+
+### Optional: Lichess OAuth token
+
+The server is **zero-config and auth-less by default** — every tool above (except one) hits public endpoints and needs no login.
+
+A few Lichess endpoints are OAuth-only. To enable the tools that need them, set a `LICHESS_TOKEN` environment variable to a [Lichess personal access token](https://lichess.org/account/oauth/token) (no scopes required for `/api/team/of`):
+
+```json
+{
+  "mcpServers": {
+    "chess-mcp": {
+      "command": "npx",
+      "args": ["-y", "chess-com-lichess-org-mcp"],
+      "env": { "LICHESS_TOKEN": "lip_xxxxxxxxxxxx" }
+    }
+  }
+}
+```
+
+- When set, the token is sent as `Authorization: Bearer <token>` **only on `lichess.org` requests** (never to the separate Opening Explorer / Tablebase hosts), and `lichess_get_user_teams` is registered.
+- When unset, behavior is unchanged: the token-only tool is simply absent from the tool list, and all public tools work as before.
 
 ## Usage examples
 

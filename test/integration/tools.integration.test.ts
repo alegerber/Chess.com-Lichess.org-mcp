@@ -53,9 +53,12 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-test("tools/list exposes all 74 tools", { skip: !RUN }, async () => {
+// 73 in the default, token-less configuration: the OAuth-only
+// lichess_get_user_teams (#30) is registered only when LICHESS_TOKEN is set,
+// and the child server here is spawned without it.
+test("tools/list exposes all 73 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 74);
+  assert.equal(tools.length, 73);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -465,3 +468,53 @@ test("lichess_tablebase resolves a drawn KvK position", { skip: !RUN }, async ()
   assert.equal(isError, false);
   assert.match(text, /Position: (draw|insufficient material)/);
 });
+
+// ─── v2: optional LICHESS_TOKEN / OAuth (#30) ──────────────────────
+// Gated on a real token. The shared client above runs token-less (so the
+// default tool list is deterministic); this spawns its own server child with
+// LICHESS_TOKEN forwarded and verifies the OAuth-only tool then works live.
+const LICHESS_TOKEN = process.env.LICHESS_TOKEN;
+
+test(
+  "lichess_get_user_teams works with a LICHESS_TOKEN (#30)",
+  { skip: !RUN || !LICHESS_TOKEN },
+  async () => {
+    const tokenTransport = new StdioClientTransport({
+      command: "node",
+      args: ["dist/index.js"],
+      env: {
+        ...(process.env as Record<string, string>),
+        LICHESS_TOKEN: LICHESS_TOKEN as string,
+      },
+    });
+    const tokenClient = new Client({
+      name: "integration-token",
+      version: "1.0.0",
+    });
+    await tokenClient.connect(tokenTransport);
+    try {
+      const { tools } = await tokenClient.listTools();
+      assert.equal(tools.length, 74);
+      assert.ok(
+        tools.find((t) => t.name === "lichess_get_user_teams"),
+        "OAuth-only tool is registered when a token is present",
+      );
+      const res = await tokenClient.callTool({
+        name: "lichess_get_user_teams",
+        arguments: { username: "thibault" },
+      });
+      const content = (res.content ?? []) as Array<{
+        type: string;
+        text?: string;
+      }>;
+      const body = content
+        .filter((c) => c.type === "text")
+        .map((c) => c.text ?? "")
+        .join("\n");
+      assert.equal(res.isError, false);
+      assert.match(body, /Found \d+ teams|not a member of any teams/);
+    } finally {
+      await tokenClient.close();
+    }
+  },
+);
