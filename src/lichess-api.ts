@@ -678,3 +678,49 @@ export function exportStudyChapterPgn(
     PGN_MEDIA_TYPE,
   );
 }
+
+// ─── Broadcasts / live relays ──────────────────────────────────────
+
+export interface BroadcastEntry {
+  tour?: { id: string; name: string };
+  round?: { id: string; name: string };
+  rounds?: { id: string; name: string }[];
+  defaultRoundId?: string;
+}
+
+export interface TopBroadcasts {
+  active?: BroadcastEntry[];
+  upcoming?: BroadcastEntry[];
+  past?: BroadcastEntry[];
+}
+
+// /api/broadcast/by/{user} returns a paginated JSON wrapper (not NDJSON).
+export interface BroadcastsByUser {
+  currentPage?: number;
+  maxPerPage?: number;
+  currentPageResults?: BroadcastEntry[];
+}
+
+const BROADCASTS_MAX = 30;
+
+// /api/broadcast streams NDJSON, one broadcast tournament per line.
+export function getBroadcasts(): Promise<BroadcastEntry[]> {
+  return fetchNdjson("/api/broadcast", BROADCASTS_MAX);
+}
+
+export function getTopBroadcasts(): Promise<TopBroadcasts> {
+  return fetchJson("/api/broadcast/top");
+}
+
+export function getBroadcastsByUser(
+  username: string,
+): Promise<BroadcastsByUser> {
+  return fetchJson(`/api/broadcast/by/${encodeURIComponent(username)}`);
+}
+
+export function getBroadcastRoundPgn(roundId: string): Promise<string> {
+  return fetchText(
+    `/api/broadcast/round/${encodeURIComponent(roundId)}.pgn`,
+    PGN_MEDIA_TYPE,
+  );
+}
