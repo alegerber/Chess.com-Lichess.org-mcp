@@ -53,9 +53,9 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-test("tools/list exposes all 53 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 54 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 53);
+  assert.equal(tools.length, 54);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -189,4 +189,26 @@ test("UAT 5.4 lichess_get_crosstable returns a head-to-head record", { skip: !RU
   });
   assert.equal(isError, false);
   assert.match(text, /Total games:/);
+});
+
+// ─── v2: Tablebase (#36) ───────────────────────────────────────────
+
+test("lichess_tablebase resolves a winning KQ vs K endgame", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_tablebase", {
+    variant: "standard",
+    fen: "4k3/8/8/8/8/8/8/4KQ2 w - - 0 1",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Position: win/);
+  assert.match(text, /DTZ/);
+  assert.match(text, /Best moves/);
+});
+
+test("lichess_tablebase resolves a drawn KvK position", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_tablebase", {
+    variant: "standard",
+    fen: "4k3/8/8/8/8/8/8/4K3 w - - 0 1",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Position: (draw|insufficient material)/);
 });

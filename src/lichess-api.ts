@@ -369,3 +369,50 @@ export function getCrosstable(
 export function getCloudEval(fen: string): Promise<unknown> {
   return fetchJson(`/api/cloud-eval?fen=${encodeURIComponent(fen)}`);
 }
+
+// ─── Tablebase ─────────────────────────────────────────────────────
+
+// Endgame tablebase lives on a separate host. Public, no auth, up to 7 pieces.
+const TABLEBASE_BASE = "https://tablebase.lichess.ovh";
+
+export interface TablebaseMove {
+  uci: string;
+  san: string;
+  category?: string;
+  dtz?: number | null;
+  dtm?: number | null;
+  zeroing?: boolean;
+  checkmate?: boolean;
+  stalemate?: boolean;
+}
+
+export interface TablebaseResult {
+  category?: string;
+  dtz?: number | null;
+  precise_dtz?: number | null;
+  dtm?: number | null;
+  checkmate?: boolean;
+  stalemate?: boolean;
+  insufficient_material?: boolean;
+  variant_win?: boolean;
+  variant_loss?: boolean;
+  moves: TablebaseMove[];
+}
+
+export async function tablebaseLookup(
+  variant: "standard" | "atomic" | "antichess",
+  fen: string,
+): Promise<TablebaseResult> {
+  const url = `${TABLEBASE_BASE}/${variant}?fen=${encodeURIComponent(fen)}`;
+  const response = await fetch(url, {
+    headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+    signal: AbortSignal.timeout(JSON_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new LichessApiError(
+      response.status,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+  return response.json() as Promise<TablebaseResult>;
+}

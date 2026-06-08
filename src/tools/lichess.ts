@@ -69,6 +69,32 @@ function formatPuzzle(data: lichess.LichessPuzzle): string {
   ].join("\n");
 }
 
+const TABLEBASE_MOVE_CAP = 12;
+
+export function formatTablebase(d: lichess.TablebaseResult): string {
+  let status = d.category ?? "unknown";
+  if (d.checkmate) status = "checkmate";
+  else if (d.stalemate) status = "stalemate";
+  else if (d.insufficient_material) status = "insufficient material";
+  const dtz = d.dtz != null ? `, DTZ ${d.dtz}` : "";
+  const dtm = d.dtm != null ? `, DTM ${d.dtm}` : "";
+  const lines = [`Position: ${status}${dtz}${dtm}`];
+  if (!d.moves || d.moves.length === 0) {
+    lines.push("No moves (terminal position or not in the tablebase).");
+    return lines.join("\n");
+  }
+  // The API already returns moves best-first; the per-move category is from the
+  // mover's opponent's perspective (so "loss" is a winning move for us).
+  lines.push("Best moves (best first):");
+  for (const m of d.moves.slice(0, TABLEBASE_MOVE_CAP)) {
+    const cat = m.category ? ` ${m.category}` : "";
+    const mdtz = m.dtz != null ? `, DTZ ${m.dtz}` : "";
+    const mdtm = m.dtm != null ? `, DTM ${m.dtm}` : "";
+    lines.push(`  ${m.san}:${cat}${mdtz}${mdtm}`);
+  }
+  return lines.join("\n");
+}
+
 // ─── Error handler ─────────────────────────────────────────────────
 
 export async function call<T>(fn: () => Promise<T>, format: (d: T) => string) {
@@ -660,5 +686,25 @@ export function registerLichessTools(server: McpServer): void {
       },
     },
     ({ fen }) => call(() => lichess.getCloudEval(fen), jsonBlock),
+  );
+
+  // ── Tablebase ───────────────────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_tablebase",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Endgame Tablebase",
+      description:
+        "Look up an endgame position (up to 7 pieces) in the Lichess tablebase. Returns the position's result (win/draw/loss), distance-to-zeroing (DTZ) and distance-to-mate (DTM), and the best moves. variant: standard, atomic, or antichess.",
+      inputSchema: {
+        variant: z
+          .enum(["standard", "atomic", "antichess"])
+          .describe("Tablebase variant"),
+        fen: z.string().describe("FEN of the endgame position to look up"),
+      },
+    },
+    ({ variant, fen }) =>
+      call(() => lichess.tablebaseLookup(variant, fen), formatTablebase),
   );
 }
