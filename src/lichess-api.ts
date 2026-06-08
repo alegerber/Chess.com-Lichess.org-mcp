@@ -427,6 +427,57 @@ export function searchTeams(text: string, page: number = 1): Promise<unknown> {
   );
 }
 
+// /api/team/all returns the same paginated JSON wrapper as /api/team/search
+// (#58): a single page of teams plus the page cursor, not a stream.
+export interface PaginatedTeams {
+  currentPage?: number;
+  maxPerPage?: number;
+  nbPages?: number;
+  nbResults?: number;
+  currentPageResults?: LichessTeam[];
+}
+
+export function getPopularTeams(page: number = 1): Promise<PaginatedTeams> {
+  return fetchJson(`/api/team/all?page=${page}`);
+}
+
+// An Arena tournament as it appears in the /api/team/{id}/arena stream. Differs
+// from the Swiss shape: the display name is `fullName` and `status` is a numeric
+// code (see ARENA_STATUS in tools/lichess.ts), not a string.
+export interface ArenaTournament {
+  id: string;
+  fullName: string;
+  status: number;
+  startsAt?: number | string;
+  nbPlayers?: number;
+  variant?: unknown;
+}
+
+// Both /swiss and /arena stream NDJSON with no server-side cap, so bound them
+// like the other team/tournament streams (cf. TEAM_MEMBERS_MAX). The user-facing
+// `max` query is clamped to this in the tool schema.
+const TEAM_TOURNAMENTS_MAX = 100;
+
+export function getTeamSwissTournaments(
+  teamId: string,
+  max: number = 30,
+): Promise<SwissInfo[]> {
+  return fetchNdjson(
+    `/api/team/${encodeURIComponent(teamId)}/swiss?max=${max}`,
+    TEAM_TOURNAMENTS_MAX,
+  );
+}
+
+export function getTeamArenaTournaments(
+  teamId: string,
+  max: number = 30,
+): Promise<ArenaTournament[]> {
+  return fetchNdjson(
+    `/api/team/${encodeURIComponent(teamId)}/arena?max=${max}`,
+    TEAM_TOURNAMENTS_MAX,
+  );
+}
+
 // /api/team/of is OAuth-only; the lichess_get_user_teams tool is registered
 // only when a LICHESS_TOKEN is configured (#30), which lichessAuthHeader() then
 // attaches to this request.

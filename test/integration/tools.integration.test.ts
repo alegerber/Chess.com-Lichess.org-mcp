@@ -53,12 +53,12 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-// 73 in the default, token-less configuration: the OAuth-only
+// 76 in the default, token-less configuration: the OAuth-only
 // lichess_get_user_teams (#30) is registered only when LICHESS_TOKEN is set,
 // and the child server here is spawned without it.
-test("tools/list exposes all 73 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 76 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 73);
+  assert.equal(tools.length, 76);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -171,6 +171,34 @@ test("lichess_get_team_members returns a bounded result for a large team", { ski
     text.length < 100_000,
     `expected a bounded result, got ${text.length} chars`,
   );
+});
+
+// ─── #58: team listings (popular teams, swiss/arena tournaments) ────
+
+test("lichess_get_popular_teams returns a page of teams", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_popular_teams", {});
+  assert.equal(isError, false);
+  // Each line carries an id + member count; the page always has results.
+  assert.match(text, /members\)/);
+});
+
+test("lichess_get_team_swiss_tournaments lists a team's Swiss events", { skip: !RUN }, async () => {
+  // 'coders' (thibault) runs a long-standing weekly Swiss series.
+  const { text, isError } = await callText("lichess_get_team_swiss_tournaments", {
+    team_id: "coders",
+    max: 5,
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Swiss tournaments|no Swiss tournaments/);
+});
+
+test("lichess_get_team_arena_tournaments lists a team's Arena events", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_team_arena_tournaments", {
+    team_id: "coders",
+    max: 5,
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Arena tournaments|no Arena tournaments/);
 });
 
 // ─── API completeness (#17) ────────────────────────────────────────
