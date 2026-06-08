@@ -17,6 +17,9 @@ export class LichessApiError extends Error {
 const JSON_TIMEOUT_MS = 10_000;
 const STREAM_TIMEOUT_MS = 30_000;
 
+/** Media type Lichess uses for raw PGN responses on game/export endpoints. */
+export const PGN_MEDIA_TYPE = "application/x-chess-pgn";
+
 async function fetchJson<T>(path: string): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const response = await fetch(url, {
@@ -35,6 +38,31 @@ async function fetchJson<T>(path: string): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+/**
+ * Fetch a raw text body (e.g. PGN) with an explicit Accept header. Game/export
+ * endpoints return PGN when asked via content negotiation (#46); the size cap is
+ * applied by the caller's formatter (capText) so this stays a thin transport.
+ */
+async function fetchText(path: string, accept: string): Promise<string> {
+  const url = `${BASE_URL}${path}`;
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: accept,
+    },
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new LichessApiError(
+      response.status,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+
+  return response.text();
 }
 
 /**
@@ -201,7 +229,8 @@ export function getUserGames(
     color?: string;
     opening?: boolean;
   } = {},
-): Promise<unknown[]> {
+  asPgn = false,
+): Promise<unknown[] | string> {
   const query = new URLSearchParams();
   if (params.max !== undefined) query.set("max", String(params.max));
   if (params.since !== undefined) query.set("since", String(params.since));
@@ -213,13 +242,16 @@ export function getUserGames(
     query.set("opening", String(params.opening));
 
   const qs = query.toString();
-  return fetchNdjson(
-    `/api/games/user/${encodeURIComponent(username)}${qs ? `?${qs}` : ""}`,
-  );
+  const path = `/api/games/user/${encodeURIComponent(username)}${qs ? `?${qs}` : ""}`;
+  return asPgn ? fetchText(path, PGN_MEDIA_TYPE) : fetchNdjson(path);
 }
 
-export function getGameById(gameId: string): Promise<unknown> {
-  return fetchJson(`/game/export/${encodeURIComponent(gameId)}`);
+export function getGameById(
+  gameId: string,
+  asPgn = false,
+): Promise<unknown | string> {
+  const path = `/game/export/${encodeURIComponent(gameId)}`;
+  return asPgn ? fetchText(path, PGN_MEDIA_TYPE) : fetchJson(path);
 }
 
 export function getCurrentGame(username: string): Promise<unknown> {

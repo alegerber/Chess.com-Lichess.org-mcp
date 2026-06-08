@@ -7,6 +7,8 @@ import {
   truncated,
   text,
   errorResult,
+  pgnOrJson,
+  capText,
 } from "../format.js";
 
 // All tools are read-only and talk to an external API.
@@ -300,25 +302,55 @@ export function registerLichessTools(server: McpServer): void {
           .boolean()
           .optional()
           .describe("Include opening information (default true)"),
+        format: z
+          .enum(["json", "pgn"])
+          .optional()
+          .describe(
+            "Output format: 'json' (default) or 'pgn' for raw PGN ready for engine analysis",
+          ),
       },
     },
-    ({ username, max, rated, perfType, color, since, until, opening }) =>
-      call(
+    ({
+      username,
+      max,
+      rated,
+      perfType,
+      color,
+      since,
+      until,
+      opening,
+      format,
+    }) => {
+      const asPgn = format === "pgn";
+      return call(
         () =>
-          lichess.getUserGames(username, {
-            max: max ?? 10,
-            rated,
-            perfType,
-            color,
-            since,
-            until,
-            opening: opening ?? true,
-          }),
-        (games) =>
-          games.length === 0
+          lichess.getUserGames(
+            username,
+            {
+              max: max ?? 10,
+              rated,
+              perfType,
+              color,
+              since,
+              until,
+              opening: opening ?? true,
+            },
+            asPgn,
+          ),
+        (data) => {
+          if (asPgn) {
+            const pgn = String(data).trim();
+            return pgn === ""
+              ? `No games found for ${username}.`
+              : capText(pgn);
+          }
+          const games = data as unknown[];
+          return games.length === 0
             ? `No games found for ${username}.`
-            : `Found ${games.length} games for ${username}.\n\n${jsonBlock(games)}`,
-      ),
+            : `Found ${games.length} games for ${username}.\n\n${jsonBlock(games)}`;
+        },
+      );
+    },
   );
 
   server.registerTool(
@@ -327,12 +359,22 @@ export function registerLichessTools(server: McpServer): void {
       annotations: READ_ONLY_HINTS,
       title: "Lichess: Get Game by ID",
       description:
-        "Get a specific Lichess game by its 8-character game ID. Returns full game data including moves, clocks, and analysis.",
+        "Get a specific Lichess game by its 8-character game ID. Returns full game data including moves, clocks, and analysis, as JSON or raw PGN.",
       inputSchema: {
         game_id: z.string().describe("Lichess game ID (8 characters)"),
+        format: z
+          .enum(["json", "pgn"])
+          .optional()
+          .describe(
+            "Output format: 'json' (default) or 'pgn' for raw PGN ready for engine analysis",
+          ),
       },
     },
-    ({ game_id }) => call(() => lichess.getGameById(game_id), jsonBlock),
+    ({ game_id, format }) =>
+      call(
+        () => lichess.getGameById(game_id, format === "pgn"),
+        (d) => pgnOrJson(d, format === "pgn"),
+      ),
   );
 
   server.registerTool(

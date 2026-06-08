@@ -18,7 +18,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `get_player_clubs` | Get clubs a player belongs to |
 | `get_player_tournaments` | Get a player's tournament history |
 | `get_player_matches` | Get a player's team match history |
-| `get_titled_players` | List players with a specific title (GM, IM, FM, etc.) |
+| `get_titled_players` | List players with a specific title (GM, IM, FM, etc.); paginate with `offset`/`limit` |
 | `get_club_profile` | Get a club's profile information |
 | `get_club_members` | Get a club's members by activity level |
 | `get_club_matches` | Get a club's team matches |
@@ -30,8 +30,8 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `get_live_team_match` | Get live team match details |
 | `get_live_team_match_board` | Get a specific board from a live team match |
 | `get_country_profile` | Get a country's profile |
-| `get_country_players` | List players from a country |
-| `get_country_clubs` | List clubs from a country |
+| `get_country_players` | List players from a country; paginate with `offset`/`limit` |
+| `get_country_clubs` | List clubs from a country; paginate with `offset`/`limit` |
 | `get_daily_puzzle` | Get today's daily puzzle |
 | `get_random_puzzle` | Get a random puzzle |
 | `get_streamers` | List Chess.com streamers |
@@ -46,8 +46,8 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `lichess_get_rating_history` | Get rating history across all variants with daily data points |
 | `lichess_get_perf_stats` | Get detailed performance stats: best wins, worst losses, streaks |
 | `lichess_get_user_activity` | Get recent activity: games, tournaments, practice, etc. |
-| `lichess_get_user_games` | Get recent games with optional filters (rated, variant, color) |
-| `lichess_get_game` | Get a specific game by its 8-character ID |
+| `lichess_get_user_games` | Get recent games with optional filters (rated, variant, color); `format: pgn` for raw PGN |
+| `lichess_get_game` | Get a specific game by its 8-character ID; `format: pgn` for raw PGN |
 | `lichess_get_current_game` | Get a user's current ongoing game or last played game |
 | `lichess_get_leaderboards` | Get top 10 players across all variants |
 | `lichess_get_leaderboard` | Get top N players for a specific variant/speed |
@@ -131,7 +131,7 @@ Once configured, you can ask your LLM things like:
 
 - Both APIs are read-only and free to use. No API keys are required.
 - **Chess.com**: Rate limiting applies to parallel requests. Data may be cached for up to 12-24 hours.
-- **Lichess**: Requests are serial (one at a time). A 429 response means you should wait ~1 minute. Game exports stream as NDJSON.
+- **Lichess**: Requests are serial (one at a time). A 429 response means you should wait ~1 minute. Game exports stream as NDJSON, or pass `format: pgn` to `lichess_get_game` / `lichess_get_user_games` for raw PGN ready for engine analysis.
 
 ## License
 
