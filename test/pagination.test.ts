@@ -57,3 +57,14 @@ test("formatList returns just the header when the list is empty", () => {
   const out = format.formatList([], { label: "players", subject: "from XX" });
   assert.equal(out, "Found 0 players from XX.");
 });
+
+test("formatList shows only the header for an out-of-range offset on a non-empty list", () => {
+  // offset past the end yields an empty page — must not render a backwards range.
+  const out = format.formatList(["a", "b", "c", "d", "e"], {
+    offset: 99,
+    limit: 2,
+    label: "players",
+  });
+  assert.equal(out, "Found 5 players.");
+  assert.doesNotMatch(out, /Showing/);
+});

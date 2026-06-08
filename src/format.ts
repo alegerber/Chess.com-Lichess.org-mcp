@@ -107,7 +107,9 @@ export function formatList(
   const { offset = 0, limit = 50, label, join = ", ", subject } = opts;
   const p = paginate(items, offset, limit);
   const header = `Found ${p.total} ${label}${subject ? ` ${subject}` : ""}.`;
-  if (p.total === 0) return header;
+  // No items to show (empty list, or an offset past the end): header only,
+  // never a backwards range like "Showing 6–5 of 5".
+  if (p.items.length === 0) return header;
   const start = p.offset + 1;
   const end = p.offset + p.items.length;
   const more =
