@@ -53,9 +53,9 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-test("tools/list exposes all 53 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 57 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 53);
+  assert.equal(tools.length, 57);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -189,4 +189,35 @@ test("UAT 5.4 lichess_get_crosstable returns a head-to-head record", { skip: !RU
   });
   assert.equal(isError, false);
   assert.match(text, /Total games:/);
+});
+
+// ─── v2: Broadcasts / live relays (#38) ────────────────────────────
+
+test("lichess_get_broadcasts returns the broadcast index", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_broadcasts");
+  assert.equal(isError, false);
+  assert.match(text, /Found \d+ broadcasts|No broadcasts found/);
+});
+
+test("lichess_get_top_broadcasts returns featured broadcasts", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_top_broadcasts");
+  assert.equal(isError, false);
+  assert.match(text, /Active: \d+/);
+});
+
+test("lichess_get_broadcasts_by_user lists a creator's broadcasts", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_broadcasts_by_user", {
+    username: "Lichess",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /broadcasts|No broadcasts/);
+});
+
+test("lichess_get_broadcast_round_pgn returns a round's PGN feed", { skip: !RUN }, async () => {
+  // Finished round of the 3rd UzChess Cup 2026 broadcast; round data persists.
+  const { text, isError } = await callText("lichess_get_broadcast_round_pgn", {
+    round_id: "rQc8SLK6",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event |No PGN available/);
 });

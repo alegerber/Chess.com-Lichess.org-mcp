@@ -69,6 +69,49 @@ function formatPuzzle(data: lichess.LichessPuzzle): string {
   ].join("\n");
 }
 
+// Char budget for raw PGN output so a live round feed can't blow the window.
+const PGN_MAX_CHARS = 50_000;
+
+function capPgn(pgn: string): string {
+  const trimmed = pgn.trim();
+  if (trimmed === "") return "No PGN available for this round yet.";
+  return trimmed.length <= PGN_MAX_CHARS
+    ? trimmed
+    : trimmed.slice(0, PGN_MAX_CHARS) +
+        `\n… truncated (${trimmed.length - PGN_MAX_CHARS} more characters not shown)`;
+}
+
+export function formatBroadcasts(items: lichess.BroadcastEntry[]): string {
+  if (items.length === 0) return "No broadcasts found.";
+  const lines = items.map((b) => {
+    const rounds = b.rounds?.length ?? 0;
+    const def = b.defaultRoundId ? `, default round ${b.defaultRoundId}` : "";
+    return `- ${b.tour?.name ?? "(unnamed)"} (${rounds} rounds${def})`;
+  });
+  return `Found ${items.length} broadcasts:\n${lines.join("\n")}`;
+}
+
+const TOP_BROADCAST_CAP = 15;
+
+export function formatTopBroadcasts(data: lichess.TopBroadcasts): string {
+  const active = data.active ?? [];
+  const upcoming = data.upcoming ?? [];
+  const past = data.past ?? [];
+  const lines = [
+    `Active: ${active.length}`,
+    `Upcoming: ${upcoming.length}`,
+    `Past: ${past.length}`,
+  ];
+  if (active.length > 0) {
+    lines.push("", "Active broadcasts:");
+    for (const b of active.slice(0, TOP_BROADCAST_CAP)) {
+      const round = b.round?.name ? ` — ${b.round.name}` : "";
+      lines.push(`- ${b.tour?.name ?? "(unnamed)"}${round}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 // ─── Error handler ─────────────────────────────────────────────────
 
 export async function call<T>(fn: () => Promise<T>, format: (d: T) => string) {
@@ -660,5 +703,64 @@ export function registerLichessTools(server: McpServer): void {
       },
     },
     ({ fen }) => call(() => lichess.getCloudEval(fen), jsonBlock),
+  );
+
+  // ── Broadcasts / live relays ────────────────────────────────────────
+
+  server.registerTool(
+    "lichess_get_broadcasts",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Broadcasts",
+      description:
+        "Get the index of official Lichess broadcasts (live tournament relays) with their rounds and default round id.",
+      inputSchema: {},
+    },
+    () => call(() => lichess.getBroadcasts(), formatBroadcasts),
+  );
+
+  server.registerTool(
+    "lichess_get_top_broadcasts",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Top Broadcasts",
+      description:
+        "Get featured Lichess broadcasts grouped into active, upcoming, and past.",
+      inputSchema: {},
+    },
+    () => call(() => lichess.getTopBroadcasts(), formatTopBroadcasts),
+  );
+
+  server.registerTool(
+    "lichess_get_broadcasts_by_user",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Broadcasts by User",
+      description:
+        "Get the broadcasts created by a specific Lichess user (most recent first).",
+      inputSchema: {
+        username: z.string().describe("Lichess username (broadcast creator)"),
+      },
+    },
+    ({ username }) =>
+      call(
+        () => lichess.getBroadcastsByUser(username),
+        (d) => formatBroadcasts(d.currentPageResults ?? []),
+      ),
+  );
+
+  server.registerTool(
+    "lichess_get_broadcast_round_pgn",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Broadcast Round PGN",
+      description:
+        "Get a broadcast round's games as PGN (the live game feed; updates during play). The round id comes from the broadcast index.",
+      inputSchema: {
+        round_id: z.string().describe("Broadcast round ID (8 characters)"),
+      },
+    },
+    ({ round_id }) =>
+      call(() => lichess.getBroadcastRoundPgn(round_id), capPgn),
   );
 }

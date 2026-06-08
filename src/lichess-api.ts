@@ -101,6 +101,30 @@ async function fetchNdjson<T>(path: string, maxLines?: number): Promise<T[]> {
   return parseNdjson<T>(buffer, maxLines);
 }
 
+/**
+ * Fetch a raw text body (PGN). Used by the broadcast round PGN export (#38);
+ * a single round is bounded, and the caller caps the displayed output.
+ */
+async function fetchText(path: string): Promise<string> {
+  const url = `${BASE_URL}${path}`;
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "application/x-chess-pgn, text/plain, */*",
+    },
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new LichessApiError(
+      response.status,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+
+  return response.text();
+}
+
 // ─── User endpoints ────────────────────────────────────────────────
 
 export interface LichessUser {
@@ -368,4 +392,47 @@ export function getCrosstable(
 
 export function getCloudEval(fen: string): Promise<unknown> {
   return fetchJson(`/api/cloud-eval?fen=${encodeURIComponent(fen)}`);
+}
+
+// ─── Broadcasts / live relays ──────────────────────────────────────
+
+export interface BroadcastEntry {
+  tour?: { id: string; name: string };
+  round?: { id: string; name: string };
+  rounds?: { id: string; name: string }[];
+  defaultRoundId?: string;
+}
+
+export interface TopBroadcasts {
+  active?: BroadcastEntry[];
+  upcoming?: BroadcastEntry[];
+  past?: BroadcastEntry[];
+}
+
+// /api/broadcast/by/{user} returns a paginated JSON wrapper (not NDJSON).
+export interface BroadcastsByUser {
+  currentPage?: number;
+  maxPerPage?: number;
+  currentPageResults?: BroadcastEntry[];
+}
+
+const BROADCASTS_MAX = 30;
+
+// /api/broadcast streams NDJSON, one broadcast tournament per line.
+export function getBroadcasts(): Promise<BroadcastEntry[]> {
+  return fetchNdjson("/api/broadcast", BROADCASTS_MAX);
+}
+
+export function getTopBroadcasts(): Promise<TopBroadcasts> {
+  return fetchJson("/api/broadcast/top");
+}
+
+export function getBroadcastsByUser(
+  username: string,
+): Promise<BroadcastsByUser> {
+  return fetchJson(`/api/broadcast/by/${encodeURIComponent(username)}`);
+}
+
+export function getBroadcastRoundPgn(roundId: string): Promise<string> {
+  return fetchText(`/api/broadcast/round/${encodeURIComponent(roundId)}.pgn`);
 }
