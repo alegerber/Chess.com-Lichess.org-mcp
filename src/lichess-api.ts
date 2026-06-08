@@ -17,6 +17,9 @@ export class LichessApiError extends Error {
 const JSON_TIMEOUT_MS = 10_000;
 const STREAM_TIMEOUT_MS = 30_000;
 
+/** Media type Lichess uses for raw PGN responses on game/export endpoints. */
+export const PGN_MEDIA_TYPE = "application/x-chess-pgn";
+
 async function fetchJson<T>(path: string): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const response = await fetch(url, {
@@ -99,6 +102,38 @@ async function fetchNdjson<T>(path: string, maxLines?: number): Promise<T[]> {
   }
   buffer += decoder.decode();
   return parseNdjson<T>(buffer, maxLines);
+}
+
+/**
+ * POST a plain-text body (a comma-separated ID list) and return the raw text
+ * response with the requested Accept type. Used by the bulk endpoints (#43),
+ * which take the IDs in the request body and content-negotiate JSON/NDJSON/PGN.
+ */
+async function postText(
+  path: string,
+  body: string,
+  accept: string,
+): Promise<string> {
+  const url = `${BASE_URL}${path}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: accept,
+      "Content-Type": "text/plain",
+    },
+    body,
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new LichessApiError(
+      response.status,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+
+  return response.text();
 }
 
 // ─── User endpoints ────────────────────────────────────────────────
@@ -362,6 +397,30 @@ export function getCrosstable(
   return fetchJson(
     `/api/crosstable/${encodeURIComponent(user1)}/${encodeURIComponent(user2)}?matchup=1`,
   );
+}
+
+// ─── Bulk endpoints ────────────────────────────────────────────────
+
+// POST /api/users takes the IDs in the body (up to 300) and returns a JSON
+// array of full user objects.
+export function getUsersByIds(ids: string[]): Promise<LichessUser[]> {
+  return postText("/api/users", ids.join(","), "application/json").then(
+    (t) => JSON.parse(t) as LichessUser[],
+  );
+}
+
+// POST /api/games/export/_ids takes the game IDs in the body and content-
+// negotiates the format: NDJSON (parsed to an array) or raw PGN.
+export function exportGamesByIds(
+  ids: string[],
+  asPgn: boolean,
+): Promise<unknown[] | string> {
+  const body = ids.join(",");
+  return asPgn
+    ? postText("/api/games/export/_ids", body, PGN_MEDIA_TYPE)
+    : postText("/api/games/export/_ids", body, "application/x-ndjson").then(
+        (t) => parseNdjson(t),
+      );
 }
 
 // ─── Cloud eval ────────────────────────────────────────────────────

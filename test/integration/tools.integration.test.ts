@@ -53,9 +53,9 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-test("tools/list exposes all 53 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 56 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 53);
+  assert.equal(tools.length, 56);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -189,4 +189,42 @@ test("UAT 5.4 lichess_get_crosstable returns a head-to-head record", { skip: !RU
   });
   assert.equal(isError, false);
   assert.match(text, /Total games:/);
+});
+
+// ─── v2: bulk endpoints (#43) + Chess.com monthly PGN (#47) ────────
+
+test("lichess_export_games_by_ids returns the requested games as JSON", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_export_games_by_ids", {
+    game_ids: ["kAdOQKeh"],
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Found \d+ games|No games found/);
+});
+
+test("lichess_export_games_by_ids returns PGN when format=pgn", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_export_games_by_ids", {
+    game_ids: ["kAdOQKeh"],
+    format: "pgn",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event /);
+});
+
+test("lichess_get_users fetches multiple users at once", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_users", {
+    usernames: ["thibault", "neio"],
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Found 2 users/);
+  assert.match(text, /thibault/);
+});
+
+test("get_monthly_archive_pgn returns a month of games as PGN", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("get_monthly_archive_pgn", {
+    username: "erik",
+    year: 2009,
+    month: 10,
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event |played no games/);
 });
