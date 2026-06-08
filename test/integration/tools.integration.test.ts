@@ -53,12 +53,12 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-// 76 in the default, token-less configuration: the OAuth-only
+// 79 in the default, token-less configuration: the OAuth-only
 // lichess_get_user_teams (#30) is registered only when LICHESS_TOKEN is set,
 // and the child server here is spawned without it.
-test("tools/list exposes all 76 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 79 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 76);
+  assert.equal(tools.length, 79);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -440,6 +440,41 @@ test("lichess_get_broadcast_round_pgn returns a round's PGN feed", { skip: !RUN 
   assert.match(text, /\[Event |No PGN available/);
 });
 
+// Stable finished broadcast: FIDE Candidates 2024 | Open (tour wEuVhT9c,
+// round S4zisI6M). A completed major event, so its metadata persists (#59).
+const BROADCAST_TOUR = "wEuVhT9c";
+const BROADCAST_ROUND = "S4zisI6M";
+
+test("lichess_get_broadcast returns tournament metadata and rounds", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_broadcast", {
+    tournament_id: BROADCAST_TOUR,
+  });
+  assert.equal(isError, false);
+  assert.match(text, /Rounds \(\d+\)/);
+});
+
+test("lichess_get_broadcast_round returns a round's games as JSON", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_broadcast_round", {
+    round_id: BROADCAST_ROUND,
+  });
+  assert.equal(isError, false);
+  // Header line plus either a games listing or a clear empty-state.
+  assert.match(text, /Games \(\d+\)|No games in this round/);
+});
+
+test("lichess_get_broadcast_pgn returns the whole tournament as PGN", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_broadcast_pgn", {
+    tournament_id: BROADCAST_TOUR,
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\[Event |No games found for this broadcast/);
+  // The download is char-bounded, so a whole-event export stays in budget.
+  assert.ok(
+    text.length < 60_000,
+    `expected a bounded PGN, got ${text.length} chars`,
+  );
+});
+
 // ─── v2: Opening Explorer (#35) ────────────────────────────────────
 // NOTE: explorer.lichess.ovh rate-limits/blocks datacenter (CI) IPs with HTTP
 // 401, so these tolerate EITHER a real result OR a clean tagged error — they
@@ -522,7 +557,9 @@ test(
     await tokenClient.connect(tokenTransport);
     try {
       const { tools } = await tokenClient.listTools();
-      assert.equal(tools.length, 74);
+      // 79 public tools + the OAuth-only lichess_get_user_teams. Keep in sync
+      // with the token-less count above (79) and server.test.ts (79 / 80).
+      assert.equal(tools.length, 80);
       assert.ok(
         tools.find((t) => t.name === "lichess_get_user_teams"),
         "OAuth-only tool is registered when a token is present",

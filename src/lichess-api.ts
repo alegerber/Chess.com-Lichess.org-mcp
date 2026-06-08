@@ -803,6 +803,97 @@ export function getBroadcastRoundPgn(roundId: string): Promise<string> {
   );
 }
 
+// Structured broadcast metadata (#59). The index types above (BroadcastEntry)
+// carry only a thin tour/round; these richer shapes back the by-id tools.
+export interface BroadcastRoundInfo {
+  id: string;
+  name: string;
+  slug?: string;
+  url?: string;
+  createdAt?: number;
+  rated?: boolean;
+  ongoing?: boolean;
+  finished?: boolean;
+  startsAt?: number;
+  finishedAt?: number;
+}
+
+export interface BroadcastTourInfo {
+  id: string;
+  name: string;
+  slug?: string;
+  url?: string;
+  createdAt?: number;
+  tier?: number;
+  description?: string;
+  dates?: number[];
+  info?: {
+    format?: string;
+    tc?: string;
+    location?: string;
+    players?: string;
+    website?: string;
+  };
+}
+
+// GET /api/broadcast/{id}: tournament info plus its rounds. Per the OpenAPI spec
+// only `tour` and `rounds` are guaranteed; defaultRoundId/group are optional.
+export interface BroadcastTournament {
+  tour: BroadcastTourInfo;
+  rounds: BroadcastRoundInfo[];
+  defaultRoundId?: string;
+  group?: { id: string; name: string };
+}
+
+export function getBroadcast(
+  tournamentId: string,
+): Promise<BroadcastTournament> {
+  return fetchJson(`/api/broadcast/${encodeURIComponent(tournamentId)}`);
+}
+
+// One board within a round; players are an inline array, both optional.
+export interface BroadcastGamePlayer {
+  name?: string;
+  title?: string;
+  rating?: number;
+  fideId?: number;
+  fed?: string;
+}
+
+export interface BroadcastGame {
+  id: string;
+  name: string;
+  fen?: string;
+  players?: BroadcastGamePlayer[];
+  lastMove?: string;
+  // Result enum: "*" (ongoing), "1-0", "0-1", or the "½-½" glyph for a draw.
+  status?: string;
+}
+
+// GET /api/broadcast/{tourSlug}/{roundSlug}/{roundId}: a single round as JSON.
+export interface BroadcastRound {
+  round: BroadcastRoundInfo;
+  tour: BroadcastTourInfo;
+  games: BroadcastGame[];
+}
+
+// The two slug segments are SEO-only — the spec states they can be replaced by
+// "-", and only the round id is used (berserk builds the same "-/-/{id}" path).
+// So this mirrors getBroadcastRoundPgn and takes just the round id.
+export function getBroadcastRound(roundId: string): Promise<BroadcastRound> {
+  return fetchJson(`/api/broadcast/-/-/${encodeURIComponent(roundId)}`);
+}
+
+// All rounds' games as one PGN. A whole tournament can be large, so bound the
+// download like the Swiss/Arena game exports rather than buffering it all.
+export function getBroadcastPgn(tournamentId: string): Promise<string> {
+  return fetchTextBounded(
+    `/api/broadcast/${encodeURIComponent(tournamentId)}.pgn`,
+    TOURNEY_PGN_MEDIA_TYPE,
+    TOURNEY_PGN_MAX_CHARS,
+  );
+}
+
 // ─── Opening Explorer ──────────────────────────────────────────────
 
 // The Opening Explorer lives on a separate host. The masters/lichess dbs
