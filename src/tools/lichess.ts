@@ -150,6 +150,11 @@ export function formatOpeningExplorer(d: lichess.ExplorerResult): string {
   return lines.join("\n");
 }
 
+/** Render a masters OTB game PGN (#60), size-capped, with an empty-state guard. */
+export function formatMastersGamePgn(pgn: string): string {
+  return pgn.trim() === "" ? "No PGN available for this game." : capPgn(pgn);
+}
+
 const TABLEBASE_MOVE_CAP = 12;
 
 export function formatTablebase(d: lichess.TablebaseResult): string {
@@ -1575,6 +1580,21 @@ export function registerLichessTools(server: McpServer): void {
           }),
         formatOpeningExplorer,
       ),
+  );
+
+  server.registerTool(
+    "lichess_get_masters_game_pgn",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Masters Game PGN",
+      description:
+        "Get the PGN of an OTB master game referenced by the Opening Explorer masters database. The game id comes from a masters-db explorer result.",
+      inputSchema: {
+        game_id: z.string().describe("Masters game ID (from the explorer)"),
+      },
+    },
+    ({ game_id }) =>
+      call(() => lichess.getMastersGamePgn(game_id), formatMastersGamePgn),
   );
 
   // ── Tablebase ───────────────────────────────────────────────────────

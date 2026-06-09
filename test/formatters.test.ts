@@ -157,3 +157,21 @@ test("formatTeamArena tolerates an unknown status code and an epoch startsAt", (
 test("formatTeamArena returns a clear empty-state message", () => {
   assert.match(lichessTools.formatTeamArena([]), /no Arena tournaments/i);
 });
+
+// ─── #60: masters game PGN render ──────────────────────────────────
+
+test("formatMastersGamePgn returns the PGN unchanged for a normal game", () => {
+  const pgn = '[Event "Casual"]\n[White "A"]\n[Black "B"]\n\n1. e4 e5 1-0';
+  assert.equal(lichessTools.formatMastersGamePgn(pgn), pgn);
+});
+
+test("formatMastersGamePgn reports a clear empty-state for a blank body", () => {
+  assert.match(lichessTools.formatMastersGamePgn("   \n  "), /No PGN/i);
+});
+
+test("formatMastersGamePgn caps an oversized PGN with a truncation marker", () => {
+  const huge = '[Event "x"]\n\n' + "1. e4 e5 ".repeat(20_000);
+  const out = lichessTools.formatMastersGamePgn(huge);
+  assert.ok(out.length < huge.length);
+  assert.match(out, /truncated/);
+});
