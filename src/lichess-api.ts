@@ -999,6 +999,32 @@ export function openingExplorer(
   return fetchExplorer(path, q);
 }
 
+// Raw-text sibling of fetchExplorer for the masters game PGN (#60). Same host,
+// no auth — distinct from fetchText, which targets the main API + attaches the
+// OAuth header.
+async function fetchExplorerText(path: string): Promise<string> {
+  const url = `${EXPLORER_BASE}${path}`;
+  const response = await fetch(url, {
+    headers: { "User-Agent": USER_AGENT, Accept: PGN_MEDIA_TYPE },
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new LichessApiError(
+      response.status,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+    );
+  }
+
+  return response.text();
+}
+
+// The masters db references OTB games and serves each one's PGN here. A single
+// game is small, so the caller display-caps rather than stream-bounds it.
+export function getMastersGamePgn(gameId: string): Promise<string> {
+  return fetchExplorerText(`/masters/pgn/${encodeURIComponent(gameId)}`);
+}
+
 // ─── Tablebase ─────────────────────────────────────────────────────
 
 // Endgame tablebase lives on a separate host. Public, no auth, up to 7 pieces.

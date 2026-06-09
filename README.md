@@ -38,7 +38,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `get_streamers` | List Chess.com streamers |
 | `get_leaderboards` | Get leaderboards for all game types |
 
-### Lichess (50 tools, +1 with `LICHESS_TOKEN`)
+### Lichess (51 tools, +1 with `LICHESS_TOKEN`)
 
 | Tool | Description |
 |------|-------------|
@@ -92,6 +92,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `lichess_get_broadcast_round_pgn` | Get a broadcast round's live PGN feed |
 | `lichess_get_broadcast_pgn` | Get a whole broadcast tournament as a single PGN |
 | `lichess_opening_explorer` | Look up a position in the Opening Explorer (masters/lichess/player) |
+| `lichess_get_masters_game_pgn` | Get the PGN of an OTB master game from the Opening Explorer |
 | `lichess_tablebase` | Endgame tablebase lookup (WDL/DTZ/DTM) for a FEN (standard/atomic/antichess) |
 
 ## Install

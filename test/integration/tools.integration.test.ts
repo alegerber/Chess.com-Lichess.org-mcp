@@ -53,12 +53,12 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-// 79 in the default, token-less configuration: the OAuth-only
+// 80 in the default, token-less configuration: the OAuth-only
 // lichess_get_user_teams (#30) is registered only when LICHESS_TOKEN is set,
 // and the child server here is spawned without it.
-test("tools/list exposes all 79 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 80 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 79);
+  assert.equal(tools.length, 80);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -510,6 +510,19 @@ test("lichess_opening_explorer player db returns a repertoire or a tagged error"
   }
 });
 
+test("lichess_get_masters_game_pgn returns a master game PGN or a tagged error", { skip: !RUN }, async () => {
+  // Same host as the explorer (blocks datacenter IPs), so tolerate a tagged
+  // error. An unreachable host or an unknown id both surface cleanly via call().
+  const { text, isError } = await callText("lichess_get_masters_game_pgn", {
+    game_id: "qVDtUe3y",
+  });
+  if (isError) {
+    assert.match(text, /Lichess error|request failed|timed out/i);
+  } else {
+    assert.match(text, /\[Event |No PGN available/);
+  }
+});
+
 // ─── v2: Tablebase (#36) ───────────────────────────────────────────
 
 test("lichess_tablebase resolves a winning KQ vs K endgame", { skip: !RUN }, async () => {
@@ -557,9 +570,9 @@ test(
     await tokenClient.connect(tokenTransport);
     try {
       const { tools } = await tokenClient.listTools();
-      // 79 public tools + the OAuth-only lichess_get_user_teams. Keep in sync
-      // with the token-less count above (79) and server.test.ts (79 / 80).
-      assert.equal(tools.length, 80);
+      // 80 public tools + the OAuth-only lichess_get_user_teams. Keep in sync
+      // with the token-less count above (80) and server.test.ts (80 / 81).
+      assert.equal(tools.length, 81);
       assert.ok(
         tools.find((t) => t.name === "lichess_get_user_teams"),
         "OAuth-only tool is registered when a token is present",
