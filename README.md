@@ -178,7 +178,7 @@ Once configured, you can ask your LLM things like:
 
 ## Notes
 
-- Both APIs are read-only and free to use. No API keys are required.
+- Both APIs are read-only and free to use. No API keys are required for the public endpoints; an optional [`LICHESS_TOKEN`](#optional-lichess-oauth-token) unlocks a few OAuth-only Lichess reads.
 - **Chess.com**: Rate limiting applies to parallel requests. Data may be cached for up to 12-24 hours.
 - **Lichess**: Requests are serial (one at a time). A 429 response means you should wait ~1 minute. Game exports stream as NDJSON, or pass `format: pgn` to `lichess_get_game` / `lichess_get_user_games` for raw PGN ready for engine analysis.
 
