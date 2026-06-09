@@ -764,6 +764,41 @@ export function registerLichessTools(server: McpServer): void {
   );
 
   server.registerTool(
+    "lichess_get_next_puzzle",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Next Puzzle",
+      description:
+        "Get a fresh Lichess puzzle (position, solution, rating, themes), " +
+        "optionally filtered by theme/opening and difficulty. Without a " +
+        "LICHESS_TOKEN this returns a random, non-personalized puzzle (no " +
+        "per-user history or rating progression); difficulty is then relative " +
+        "to a 1500 rating.",
+      inputSchema: {
+        theme: z
+          .string()
+          .optional()
+          .describe(
+            "Puzzle theme key (e.g. 'fork', 'endgame', 'mateIn2') or opening to filter by",
+          ),
+        difficulty: z
+          .enum(["easiest", "easier", "normal", "harder", "hardest"])
+          .optional()
+          .describe("Desired difficulty, relative to the puzzle rating"),
+        color: z
+          .enum(["white", "black"])
+          .optional()
+          .describe("Side to play (default: ~50% white)"),
+      },
+    },
+    ({ theme, difficulty, color }) =>
+      call(
+        () => lichess.getNextPuzzle({ angle: theme, difficulty, color }),
+        formatPuzzle,
+      ),
+  );
+
+  server.registerTool(
     "lichess_get_storm_dashboard",
     {
       annotations: READ_ONLY_HINTS,

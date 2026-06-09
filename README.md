@@ -38,7 +38,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `get_streamers` | List Chess.com streamers |
 | `get_leaderboards` | Get leaderboards for all game types |
 
-### Lichess (51 tools, +1 with `LICHESS_TOKEN`)
+### Lichess (52 tools, +1 with `LICHESS_TOKEN`)
 
 | Tool | Description |
 |------|-------------|
@@ -54,6 +54,7 @@ An MCP (Model Context Protocol) server that provides access to the [Chess.com Pu
 | `lichess_get_leaderboard` | Get top N players for a specific variant/speed |
 | `lichess_get_daily_puzzle` | Get today's daily puzzle with solution and themes |
 | `lichess_get_puzzle` | Get a specific puzzle by ID |
+| `lichess_get_next_puzzle` | Get a fresh puzzle, optionally by theme/difficulty |
 | `lichess_get_storm_dashboard` | Get a user's Puzzle Storm statistics |
 | `lichess_get_team` | Get a team's profile, description, and member count |
 | `lichess_search_teams` | Search for teams by name |

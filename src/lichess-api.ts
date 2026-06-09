@@ -401,6 +401,31 @@ export function getPuzzleById(id: string): Promise<LichessPuzzle> {
   return fetchJson(`/api/puzzle/${encodeURIComponent(id)}`);
 }
 
+export interface NextPuzzleOptions {
+  // The query param is "angle": a puzzle theme key or an opening.
+  angle?: string;
+  difficulty?: string;
+  color?: string;
+}
+
+// Exposed so the optional-filter wiring (#61) is unit-testable without a network
+// call: only the provided params appear, and they are URL-encoded.
+export function nextPuzzlePath(opts: NextPuzzleOptions): string {
+  const q = new URLSearchParams();
+  if (opts.angle) q.set("angle", opts.angle);
+  if (opts.difficulty) q.set("difficulty", opts.difficulty);
+  if (opts.color) q.set("color", opts.color);
+  const qs = q.toString();
+  return qs ? `/api/puzzle/next?${qs}` : "/api/puzzle/next";
+}
+
+// Public next-puzzle endpoint: anonymous callers get a random puzzle (difficulty
+// relative to a 1500 rating). fetchJson attaches LICHESS_TOKEN when configured,
+// which personalizes the result (unseen puzzles, rating-relative difficulty).
+export function getNextPuzzle(opts: NextPuzzleOptions): Promise<LichessPuzzle> {
+  return fetchJson(nextPuzzlePath(opts));
+}
+
 export function getStormDashboard(username: string): Promise<unknown> {
   return fetchJson(`/api/storm/dashboard/${encodeURIComponent(username)}`);
 }
