@@ -282,6 +282,37 @@ export function formatStandings(rows: lichess.StandingRow[]): string {
   return `${rows.length} players:\n${lines.join("\n")}`;
 }
 
+// Team battles list every team; cap the output and the per-team player preview.
+const TEAM_BATTLE_TEAMS_CAP = 30;
+const TEAM_BATTLE_PLAYERS_CAP = 5;
+
+export function formatTournamentTeams(
+  data: lichess.TournamentTeamStandings | null,
+): string {
+  // A normal (non-team-battle) arena returns a literal JSON null body.
+  const teams = data?.teams ?? [];
+  if (teams.length === 0) {
+    return "This tournament is not a team battle (no team standings).";
+  }
+  const lines = teams.slice(0, TEAM_BATTLE_TEAMS_CAP).map((t) => {
+    const top = (t.players ?? [])
+      .slice(0, TEAM_BATTLE_PLAYERS_CAP)
+      .map((p) => {
+        const title = p.user.title ? `${p.user.title} ` : "";
+        const score = p.score !== undefined ? ` ${p.score}` : "";
+        return `${title}${p.user.name}${score}`;
+      })
+      .join(", ");
+    const players = top ? ` — top: ${top}` : "";
+    return `${t.rank}. ${t.id} — ${t.score} pts${players}`;
+  });
+  const more =
+    teams.length > TEAM_BATTLE_TEAMS_CAP
+      ? `\n… ${teams.length - TEAM_BATTLE_TEAMS_CAP} more teams not shown`
+      : "";
+  return `${teams.length} teams:\n${lines.join("\n")}${more}`;
+}
+
 const SIMUL_LIST_CAP = 20;
 
 export function formatSimuls(data: lichess.SimulsResponse): string {
@@ -1340,6 +1371,24 @@ export function registerLichessTools(server: McpServer): void {
     },
     ({ tournament_id }) =>
       call(() => lichess.getArenaResults(tournament_id), formatStandings),
+  );
+
+  server.registerTool(
+    "lichess_get_tournament_teams",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Team Battle Standings",
+      description:
+        "Get the per-team standings of a Lichess team-battle Arena tournament: each team's rank, total score, and top players. Returns a clear message for a normal (non-team-battle) tournament.",
+      inputSchema: {
+        tournament_id: z.string().describe("Lichess Arena tournament ID"),
+      },
+    },
+    ({ tournament_id }) =>
+      call(
+        () => lichess.getTournamentTeams(tournament_id),
+        formatTournamentTeams,
+      ),
   );
 
   server.registerTool(

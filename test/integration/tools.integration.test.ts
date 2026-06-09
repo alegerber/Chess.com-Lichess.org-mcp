@@ -53,12 +53,12 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-// 81 in the default, token-less configuration: the OAuth-only
+// 82 in the default, token-less configuration: the OAuth-only
 // lichess_get_user_teams (#30) is registered only when LICHESS_TOKEN is set,
 // and the child server here is spawned without it.
-test("tools/list exposes all 81 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 82 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 81);
+  assert.equal(tools.length, 82);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -399,6 +399,25 @@ test("lichess_get_tournament_games returns arena games as PGN", { skip: !RUN }, 
   assert.match(text, /\[Event |No games found/);
 });
 
+test("lichess_get_tournament_teams returns team-battle standings (#62)", { skip: !RUN }, async () => {
+  // 'Giri Team Battle' (finished 2019), a stable team battle with 10 teams.
+  const { text, isError } = await callText("lichess_get_tournament_teams", {
+    tournament_id: "QQDJENHA",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /\d+ teams:/);
+  assert.match(text, /1\. .+ pts/);
+});
+
+test("lichess_get_tournament_teams reports a non-team-battle arena cleanly (#62)", { skip: !RUN }, async () => {
+  // evAxzsSV is a normal arena; /teams returns a literal null body -> clear message.
+  const { text, isError } = await callText("lichess_get_tournament_teams", {
+    tournament_id: "evAxzsSV",
+  });
+  assert.equal(isError, false);
+  assert.match(text, /not a team battle/i);
+});
+
 test("lichess_get_simuls returns the simul groups", { skip: !RUN }, async () => {
   const { text, isError } = await callText("lichess_get_simuls");
   assert.equal(isError, false);
@@ -594,9 +613,9 @@ test(
     await tokenClient.connect(tokenTransport);
     try {
       const { tools } = await tokenClient.listTools();
-      // 81 public tools + the OAuth-only lichess_get_user_teams. Keep in sync
-      // with the token-less count above (81) and server.test.ts (81 / 82).
-      assert.equal(tools.length, 82);
+      // 82 public tools + the OAuth-only lichess_get_user_teams. Keep in sync
+      // with the token-less count above (82) and server.test.ts (82 / 83).
+      assert.equal(tools.length, 83);
       assert.ok(
         tools.find((t) => t.name === "lichess_get_user_teams"),
         "OAuth-only tool is registered when a token is present",
