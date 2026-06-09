@@ -53,12 +53,12 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-// 80 in the default, token-less configuration: the OAuth-only
+// 81 in the default, token-less configuration: the OAuth-only
 // lichess_get_user_teams (#30) is registered only when LICHESS_TOKEN is set,
 // and the child server here is spawned without it.
-test("tools/list exposes all 80 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 81 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 80);
+  assert.equal(tools.length, 81);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -142,6 +142,23 @@ test("UAT 5.2 lichess_get_daily_puzzle returns a puzzle", { skip: !RUN }, async 
   const { text, isError } = await callText("lichess_get_daily_puzzle");
   assert.equal(isError, false);
   assert.match(text, /Puzzle ID:/i);
+});
+
+test("lichess_get_next_puzzle returns a fresh puzzle (#61)", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_next_puzzle");
+  assert.equal(isError, false);
+  assert.match(text, /Puzzle ID:/i);
+  assert.match(text, /Themes:/i);
+});
+
+test("lichess_get_next_puzzle honours a theme filter (#61)", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_get_next_puzzle", {
+    theme: "endgame",
+    difficulty: "normal",
+  });
+  assert.equal(isError, false);
+  // The filtered puzzle should advertise the requested theme.
+  assert.match(text, /Themes:.*endgame/i);
 });
 
 test("UAT 6.3 lichess_get_tv_channels returns content", { skip: !RUN }, async () => {
@@ -570,9 +587,9 @@ test(
     await tokenClient.connect(tokenTransport);
     try {
       const { tools } = await tokenClient.listTools();
-      // 80 public tools + the OAuth-only lichess_get_user_teams. Keep in sync
-      // with the token-less count above (80) and server.test.ts (80 / 81).
-      assert.equal(tools.length, 81);
+      // 81 public tools + the OAuth-only lichess_get_user_teams. Keep in sync
+      // with the token-less count above (81) and server.test.ts (81 / 82).
+      assert.equal(tools.length, 82);
       assert.ok(
         tools.find((t) => t.name === "lichess_get_user_teams"),
         "OAuth-only tool is registered when a token is present",
