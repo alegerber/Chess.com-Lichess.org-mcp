@@ -5,6 +5,7 @@ import type {
   PaginatedTeams,
   SwissInfo,
   ArenaTournament,
+  TournamentTeamStandings,
 } from "../src/lichess-api.js";
 import type { PlayerProfile } from "../src/chess-api.js";
 import * as lichessTools from "../src/tools/lichess.js";
@@ -174,4 +175,76 @@ test("formatMastersGamePgn caps an oversized PGN with a truncation marker", () =
   const out = lichessTools.formatMastersGamePgn(huge);
   assert.ok(out.length < huge.length);
   assert.match(out, /truncated/);
+});
+
+// ─── #62: team-battle standings ────────────────────────────────────
+
+test("formatTournamentTeams ranks teams with scores and each team's top players", () => {
+  const data = {
+    id: "QQDJENHA",
+    teams: [
+      {
+        rank: 1,
+        id: "team-alpha",
+        score: 37,
+        players: [
+          { user: { id: "drmelekess", name: "DrMelekess", title: "GM" }, score: 20 },
+          { user: { id: "p2", name: "Player Two" }, score: 17 },
+        ],
+      },
+      {
+        rank: 2,
+        id: "team-beta",
+        score: 35,
+        players: [{ user: { id: "p3", name: "Player Three" }, score: 35 }],
+      },
+    ],
+  } as unknown as TournamentTeamStandings;
+
+  const out = lichessTools.formatTournamentTeams(data);
+  assert.match(out, /2 teams:/);
+  assert.match(out, /1\. team-alpha — 37 pts/);
+  assert.match(out, /GM DrMelekess/);
+  assert.match(out, /2\. team-beta — 35 pts/);
+});
+
+test("formatTournamentTeams returns a clear message for a non-team-battle (null body)", () => {
+  assert.match(
+    lichessTools.formatTournamentTeams(null),
+    /not a team battle/i,
+  );
+});
+
+test("formatTournamentTeams treats an empty teams array as a non-team-battle", () => {
+  const data = { id: "x", teams: [] } as unknown as TournamentTeamStandings;
+  assert.match(lichessTools.formatTournamentTeams(data), /not a team battle/i);
+});
+
+test("formatTournamentTeams tolerates a missing player score and players array", () => {
+  const data = {
+    id: "x",
+    teams: [
+      { rank: 1, id: "t1", score: 10, players: [{ user: { id: "u", name: "U" } }] },
+      { rank: 2, id: "t2", score: 8 },
+    ],
+  } as unknown as TournamentTeamStandings;
+  let out = "";
+  assert.doesNotThrow(() => {
+    out = lichessTools.formatTournamentTeams(data);
+  });
+  assert.match(out, /1\. t1 — 10 pts/);
+  assert.match(out, /2\. t2 — 8 pts/);
+});
+
+test("formatTournamentTeams caps a large team list", () => {
+  const teams = Array.from({ length: 40 }, (_, i) => ({
+    rank: i + 1,
+    id: `team-${i}`,
+    score: 100 - i,
+    players: [],
+  }));
+  const data = { id: "x", teams } as unknown as TournamentTeamStandings;
+  const out = lichessTools.formatTournamentTeams(data);
+  assert.match(out, /40 teams:/);
+  assert.match(out, /more teams not shown/);
 });

@@ -696,6 +696,35 @@ export function getArenaGames(
     : fetchNdjson(path, STANDINGS_MAX);
 }
 
+// Team-battle per-team standings (#62). Each team carries its rank, total score,
+// and a leaderboard subset of its top players (player.score is optional per spec).
+export interface TeamBattlePlayer {
+  user: { id: string; name: string; title?: string };
+  score?: number;
+}
+
+export interface TeamBattleTeam {
+  rank: number;
+  id: string;
+  score: number;
+  players: TeamBattlePlayer[];
+}
+
+export interface TournamentTeamStandings {
+  id: string;
+  teams: TeamBattleTeam[];
+}
+
+// A non-team-battle arena returns HTTP 200 with a literal JSON `null` body (not
+// 404, not an empty object), so the parsed result is nullable — the formatter
+// turns that into a clear "not a team battle" message. An unknown id 404s and
+// surfaces as a tagged error through call().
+export function getTournamentTeams(
+  id: string,
+): Promise<TournamentTeamStandings | null> {
+  return fetchJson(`/api/tournament/${encodeURIComponent(id)}/teams`);
+}
+
 export function getSimuls(): Promise<SimulsResponse> {
   return fetchJson("/api/simul");
 }
