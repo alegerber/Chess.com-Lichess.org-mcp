@@ -53,12 +53,12 @@ async function callText(
 
 // ─── Protocol ──────────────────────────────────────────────────────
 
-// 82 in the default, token-less configuration: the OAuth-only
+// 83 in the default, token-less configuration: the OAuth-only
 // lichess_get_user_teams (#30) is registered only when LICHESS_TOKEN is set,
 // and the child server here is spawned without it.
-test("tools/list exposes all 82 tools", { skip: !RUN }, async () => {
+test("tools/list exposes all 83 tools", { skip: !RUN }, async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 82);
+  assert.equal(tools.length, 83);
 });
 
 test("flags input that violates the Zod schema", { skip: !RUN }, async () => {
@@ -381,6 +381,15 @@ test("lichess_get_swiss_games returns PGN with format=pgn", { skip: !RUN }, asyn
   assert.match(text, /\[Event |No games found/);
 });
 
+test("lichess_export_swiss_trf returns TRF text (#63)", { skip: !RUN }, async () => {
+  const { text, isError } = await callText("lichess_export_swiss_trf", {
+    swiss_id: SWISS_ID,
+  });
+  assert.equal(isError, false);
+  // TRF records start with a 3-digit data-identification number (e.g. 012, 001).
+  assert.match(text, /^\d{3}[ ]|No TRF available/m);
+});
+
 test("lichess_get_tournament_results returns arena standings", { skip: !RUN }, async () => {
   // Lichess keeps tournaments indefinitely, so this finished arena id stays valid.
   const { text, isError } = await callText("lichess_get_tournament_results", {
@@ -613,9 +622,9 @@ test(
     await tokenClient.connect(tokenTransport);
     try {
       const { tools } = await tokenClient.listTools();
-      // 82 public tools + the OAuth-only lichess_get_user_teams. Keep in sync
-      // with the token-less count above (82) and server.test.ts (82 / 83).
-      assert.equal(tools.length, 83);
+      // 83 public tools + the OAuth-only lichess_get_user_teams. Keep in sync
+      // with the token-less count above (83) and server.test.ts (83 / 84).
+      assert.equal(tools.length, 84);
       assert.ok(
         tools.find((t) => t.name === "lichess_get_user_teams"),
         "OAuth-only tool is registered when a token is present",

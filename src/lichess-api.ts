@@ -679,6 +679,18 @@ export function getSwissGames(
     : fetchNdjson(path, STANDINGS_MAX);
 }
 
+// Swiss TRF(x) export (#63): the FIDE-standard pairing format consumed by
+// external tools. Note the path has NO /api prefix (unlike the other swiss
+// endpoints) — it is served at lichess.org/swiss/{id}.trf. A whole event can be
+// large, so bound the download like the game exports.
+export function getSwissTrf(id: string): Promise<string> {
+  return fetchTextBounded(
+    `/swiss/${encodeURIComponent(id)}.trf`,
+    "text/plain",
+    TOURNEY_PGN_MAX_CHARS,
+  );
+}
+
 export function getArenaResults(id: string): Promise<StandingRow[]> {
   return fetchNdjson(
     `/api/tournament/${encodeURIComponent(id)}/results`,

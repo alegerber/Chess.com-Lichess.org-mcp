@@ -34,7 +34,7 @@ test("every tool is annotated read-only and open-world (L3)", async () => {
   // Default, token-less experience: the OAuth-only tool (#30) is omitted.
   const client = await connectedClient();
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 82);
+  assert.equal(tools.length, 83);
   for (const t of tools) {
     assert.equal(t.annotations?.readOnlyHint, true, `${t.name}: readOnlyHint`);
     assert.equal(t.annotations?.openWorldHint, true, `${t.name}: openWorldHint`);
@@ -56,7 +56,7 @@ test("server exposes instructions (L4)", async () => {
 test("lichess_get_user_teams is absent without a LICHESS_TOKEN (#30)", async () => {
   const client = await connectedClient(); // no token
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 82);
+  assert.equal(tools.length, 83);
   assert.equal(
     tools.find((t) => t.name === "lichess_get_user_teams"),
     undefined,
@@ -68,7 +68,7 @@ test("lichess_get_user_teams is absent without a LICHESS_TOKEN (#30)", async () 
 test("lichess_get_user_teams is registered with a LICHESS_TOKEN (#30)", async () => {
   const client = await connectedClient("lip_test_token");
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 83);
+  assert.equal(tools.length, 84);
   const tool = tools.find((t) => t.name === "lichess_get_user_teams");
   assert.ok(tool, "OAuth-only tool is registered when a token is present");
   assert.match(tool.description ?? "", /team/i);

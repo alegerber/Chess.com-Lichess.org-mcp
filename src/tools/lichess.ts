@@ -155,6 +155,13 @@ export function formatMastersGamePgn(pgn: string): string {
   return pgn.trim() === "" ? "No PGN available for this game." : capPgn(pgn);
 }
 
+/** Render a Swiss tournament's TRF export (#63), size-capped, with an empty guard. */
+export function formatSwissTrf(trf: string): string {
+  return trf.trim() === ""
+    ? "No TRF available for this tournament."
+    : capText(trf);
+}
+
 const TABLEBASE_MOVE_CAP = 12;
 
 export function formatTablebase(d: lichess.TablebaseResult): string {
@@ -1354,6 +1361,20 @@ export function registerLichessTools(server: McpServer): void {
         (data) => renderGames(data, asPgn),
       );
     },
+  );
+
+  server.registerTool(
+    "lichess_export_swiss_trf",
+    {
+      annotations: READ_ONLY_HINTS,
+      title: "Lichess: Swiss TRF Export",
+      description:
+        "Export a Lichess Swiss tournament in TRF(x) format — the FIDE-standard Tournament Report File consumed by external pairing software. Returns size-capped text.",
+      inputSchema: {
+        swiss_id: z.string().describe("Lichess Swiss tournament ID"),
+      },
+    },
+    ({ swiss_id }) => call(() => lichess.getSwissTrf(swiss_id), formatSwissTrf),
   );
 
   // ── Arena tournaments (results + games) ─────────────────────────────

@@ -177,6 +177,24 @@ test("formatMastersGamePgn caps an oversized PGN with a truncation marker", () =
   assert.match(out, /truncated/);
 });
 
+// ─── #63: Swiss TRF export render ──────────────────────────────────
+
+test("formatSwissTrf returns the TRF text unchanged for a normal export", () => {
+  const trf = "012 My Swiss\n032 Lichess\n001    1 m  ... ";
+  assert.equal(lichessTools.formatSwissTrf(trf), trf);
+});
+
+test("formatSwissTrf reports a clear empty-state for a blank body", () => {
+  assert.match(lichessTools.formatSwissTrf("  \n "), /No TRF/i);
+});
+
+test("formatSwissTrf caps an oversized TRF with a truncation marker", () => {
+  const huge = "001 " + "x".repeat(80_000);
+  const out = lichessTools.formatSwissTrf(huge);
+  assert.ok(out.length < huge.length);
+  assert.match(out, /truncated/);
+});
+
 // ─── #62: team-battle standings ────────────────────────────────────
 
 test("formatTournamentTeams ranks teams with scores and each team's top players", () => {
