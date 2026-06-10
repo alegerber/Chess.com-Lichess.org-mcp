@@ -80,6 +80,39 @@ export function formatOnlineStatus(
     : `${username} is offline (last online ${seen})`;
 }
 
+// Tournament responses inline the full player list — hundreds of entries for a
+// big knockout — so cap it like get_club_members caps its member groups.
+const TOURNAMENT_PLAYERS_CAP = 50;
+
+export function formatTournament(d: api.TournamentProfile): string {
+  const lines: string[] = [
+    `Name: ${d.name}`,
+    `URL: ${d.url}`,
+    `Status: ${d.status}`,
+    `Creator: ${d.creator}`,
+  ];
+  if (d.finish_time) lines.push(`Finished: ${toISOString(d.finish_time, "s")}`);
+  if (d.description) lines.push(`Description: ${d.description}`);
+  lines.push(`Settings: ${jsonBlock(d.settings)}`);
+  const rounds = d.rounds ?? [];
+  lines.push(`Rounds (${rounds.length}):`);
+  for (const r of rounds) lines.push(`- ${r}`);
+  const players = d.players ?? [];
+  lines.push(`Players (${players.length}):`);
+  lines.push(truncated(players, TOURNAMENT_PLAYERS_CAP, "players"));
+  return lines.join("\n");
+}
+
+export function formatTournamentRound(d: api.TournamentRound): string {
+  const groups = d.groups ?? [];
+  const players = d.players ?? [];
+  const lines: string[] = [`Groups (${groups.length}):`];
+  for (const g of groups) lines.push(`- ${g}`);
+  lines.push(`Players (${players.length}):`);
+  lines.push(truncated(players, TOURNAMENT_PLAYERS_CAP, "players"));
+  return lines.join("\n");
+}
+
 // ─── Error handler ─────────────────────────────────────────────────
 
 export async function call<T>(fn: () => Promise<T>, format: (d: T) => string) {
@@ -469,7 +502,8 @@ export function registerChessTools(server: McpServer): void {
           ),
       },
     },
-    ({ url_id }) => call(() => api.getTournamentProfile(url_id), jsonBlock),
+    ({ url_id }) =>
+      call(() => api.getTournamentProfile(url_id), formatTournament),
   );
 
   server.registerTool(
@@ -485,7 +519,7 @@ export function registerChessTools(server: McpServer): void {
       },
     },
     ({ url_id, round }) =>
-      call(() => api.getTournamentRound(url_id, round), jsonBlock),
+      call(() => api.getTournamentRound(url_id, round), formatTournamentRound),
   );
 
   server.registerTool(

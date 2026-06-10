@@ -5,7 +5,9 @@ import type {
   StandingRow,
   Simul,
 } from "../src/lichess-api.js";
+import type { TournamentProfile, TournamentRound } from "../src/chess-api.js";
 import * as lichessTools from "../src/tools/lichess.js";
+import * as chessTools from "../src/tools/chess.js";
 
 // ─── formatSwiss (#37) ─────────────────────────────────────────────
 
@@ -106,4 +108,67 @@ test("formatSimuls reports when nothing is active", () => {
     finished: [],
   });
   assert.match(out, /No active simuls/);
+});
+
+// ─── Chess.com tournament formatters ───────────────────────────────
+// get_tournament / get_tournament_round used to dump the raw JSON, inlining
+// multi-hundred-entry player lists; the formatters cap the players instead.
+
+const makePlayers = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({
+    username: `player${i}`,
+    status: "eliminated",
+  }));
+
+test("formatTournament renders metadata, rounds, and a capped player list", () => {
+  const d: TournamentProfile = {
+    name: "Quick Knockouts",
+    url: "https://www.chess.com/tournament/x",
+    description: "A knockout tournament",
+    creator: "erik",
+    status: "finished",
+    finish_time: 1389668157,
+    settings: { time_class: "daily", rules: "chess" },
+    players: makePlayers(51),
+    rounds: ["https://api.chess.com/pub/tournament/x/1"],
+  };
+  const out = chessTools.formatTournament(d);
+  assert.match(out, /Quick Knockouts/);
+  assert.match(out, /Status: finished/);
+  assert.match(out, /Finished: 2014-01-14/);
+  assert.match(out, /time_class/); // settings survive
+  assert.match(out, /Rounds \(1\)/);
+  assert.match(out, /tournament\/x\/1/);
+  assert.match(out, /Players \(51\)/); // header shows the true total
+  assert.match(out, /… 1 more players not shown/); // exact remainder past the cap
+  assert.match(out, /player0/);
+  assert.doesNotMatch(out, /player50/); // the 51st entry is never inlined
+});
+
+test("formatTournament tolerates missing finish_time and empty lists", () => {
+  const d = {
+    name: "Bare",
+    url: "https://www.chess.com/tournament/bare",
+    description: "",
+    creator: "c",
+    status: "in_progress",
+    settings: {},
+    players: [],
+    rounds: [],
+  } as TournamentProfile;
+  const out = chessTools.formatTournament(d);
+  assert.match(out, /Players \(0\)/);
+  assert.doesNotMatch(out, /Finished:/);
+});
+
+test("formatTournamentRound lists group URLs and caps the player list", () => {
+  const d: TournamentRound = {
+    groups: ["https://api.chess.com/pub/tournament/x/1/1"],
+    players: makePlayers(51),
+  };
+  const out = chessTools.formatTournamentRound(d);
+  assert.match(out, /Groups \(1\)/);
+  assert.match(out, /tournament\/x\/1\/1/);
+  assert.match(out, /Players \(51\)/);
+  assert.match(out, /… 1 more players not shown/);
 });
