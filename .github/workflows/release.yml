@@ -2,6 +2,10 @@ name: Release
 
 # Publishes to npm when a GitHub Release is published (or via manual dispatch).
 # Never runs on push/PR, so a merge can't trigger a publish.
+#
+# Auth is npm Trusted Publishing (OIDC): the npm package is configured to trust
+# this repo + workflow file, so no NPM_TOKEN secret is needed. Provenance is
+# generated as part of the same OIDC exchange.
 on:
   release:
     types: [published]
@@ -9,28 +13,30 @@ on:
 
 permissions:
   contents: read
-  id-token: write # required for npm provenance (OIDC)
+  id-token: write # required for npm trusted publishing + provenance (OIDC)
 
 jobs:
   publish:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: npm ci
 
+      # Trusted publishing needs npm >= 11.5.1; the runner's bundled npm can lag.
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@latest
+
       # `npm publish` runs the prepublishOnly hook (lint + build + test) first,
       # so a release that fails any of those is not published.
       - name: Publish to npm
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
