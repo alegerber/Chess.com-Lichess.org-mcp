@@ -32,6 +32,19 @@ test("formatBroadcasts reports an empty list", () => {
   assert.match(lichessTools.formatBroadcasts([]), /No broadcasts found/);
 });
 
+// The by-id tools (lichess_get_broadcast, lichess_get_broadcast_pgn) need the
+// tournament id, so the index must surface it — not just the round ids.
+test("formatBroadcasts shows each tournament's id", () => {
+  const items: BroadcastEntry[] = [
+    {
+      tour: { id: "7vwl29HB", name: "3rd UzChess Cup 2026" },
+      rounds: [{ id: "rQc8SLK6", name: "Round 1" }],
+    },
+  ];
+  const out = lichessTools.formatBroadcasts(items);
+  assert.match(out, /3rd UzChess Cup 2026 \(7vwl29HB\)/);
+});
+
 // ─── formatTopBroadcasts (#38 — /top) ──────────────────────────────
 
 test("formatTopBroadcasts summarizes counts and lists active broadcasts", () => {
@@ -50,6 +63,20 @@ test("formatTopBroadcasts summarizes counts and lists active broadcasts", () => 
   assert.match(out, /Past: 2/);
   assert.match(out, /French Club Champ/);
   assert.match(out, /Round 5/);
+});
+
+test("formatTopBroadcasts shows active tournaments' ids", () => {
+  const out = lichessTools.formatTopBroadcasts({
+    active: [
+      {
+        tour: { id: "a1B2c3D4", name: "French Club Champ" },
+        round: { id: "r", name: "Round 5" },
+      },
+    ],
+    upcoming: [],
+    past: [],
+  });
+  assert.match(out, /French Club Champ \(a1B2c3D4\)/);
 });
 
 test("formatTopBroadcasts handles no active broadcasts", () => {

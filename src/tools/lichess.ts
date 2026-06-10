@@ -356,7 +356,10 @@ export function formatBroadcasts(items: lichess.BroadcastEntry[]): string {
   const lines = items.map((b) => {
     const rounds = b.rounds?.length ?? 0;
     const def = b.defaultRoundId ? `, default round ${b.defaultRoundId}` : "";
-    return `- ${b.tour?.name ?? "(unnamed)"} (${rounds} rounds${def})`;
+    // Surface the tournament id — it's what the by-id tools
+    // (lichess_get_broadcast, lichess_get_broadcast_pgn) take as input.
+    const id = b.tour?.id ? ` (${b.tour.id})` : "";
+    return `- ${b.tour?.name ?? "(unnamed)"}${id} — ${rounds} rounds${def}`;
   });
   return `Found ${items.length} broadcasts:\n${lines.join("\n")}`;
 }
@@ -376,7 +379,8 @@ export function formatTopBroadcasts(data: lichess.TopBroadcasts): string {
     lines.push("", "Active broadcasts:");
     for (const b of active.slice(0, TOP_BROADCAST_CAP)) {
       const round = b.round?.name ? ` — ${b.round.name}` : "";
-      lines.push(`- ${b.tour?.name ?? "(unnamed)"}${round}`);
+      const id = b.tour?.id ? ` (${b.tour.id})` : "";
+      lines.push(`- ${b.tour?.name ?? "(unnamed)"}${id}${round}`);
     }
   }
   return lines.join("\n");

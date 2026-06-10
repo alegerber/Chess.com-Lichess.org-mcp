@@ -968,6 +968,18 @@ export function getBroadcastPgn(tournamentId: string): Promise<string> {
 // works for both. Public, no auth.
 const EXPLORER_BASE = "https://explorer.lichess.ovh";
 
+/**
+ * The explorer/tablebase *.lichess.ovh hosts take no auth, yet reject some
+ * client IPs (datacenter/VPN ranges) with 401/403. Spell that out in the error
+ * message — a bare 401 reads as a token problem, which it never is here since
+ * no Authorization header is sent to these hosts.
+ */
+export function ovhHostErrorHint(status: number): string {
+  return status === 401 || status === 403
+    ? " (this host takes no auth and none was sent — it rejects some IPs, e.g. datacenter/VPN ranges; try from a different network)"
+    : "";
+}
+
 export interface ExplorerMove {
   uci: string;
   san: string;
@@ -1016,7 +1028,7 @@ async function fetchExplorer(
   if (!response.ok) {
     throw new LichessApiError(
       response.status,
-      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}${ovhHostErrorHint(response.status)}`,
     );
   }
 
@@ -1078,7 +1090,7 @@ async function fetchExplorerText(path: string): Promise<string> {
   if (!response.ok) {
     throw new LichessApiError(
       response.status,
-      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}${ovhHostErrorHint(response.status)}`,
     );
   }
 
@@ -1132,7 +1144,7 @@ export async function tablebaseLookup(
   if (!response.ok) {
     throw new LichessApiError(
       response.status,
-      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}${ovhHostErrorHint(response.status)}`,
     );
   }
   return response.json() as Promise<TablebaseResult>;
