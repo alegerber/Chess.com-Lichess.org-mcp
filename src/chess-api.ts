@@ -375,8 +375,27 @@ export interface Streamers {
   streamers: unknown[];
 }
 
-export function getStreamers(): Promise<Streamers> {
-  return fetchApi("/streamers");
+/**
+ * /pub/streamers is still in the official Published-Data docs but has been
+ * observed to 404 upstream; flag that so the error isn't mistaken for a wrong
+ * path in this client.
+ */
+export function streamersErrorHint(status: number): string {
+  return status === 404
+    ? " (the endpoint is documented but currently 404s upstream — a Chess.com-side outage, not a wrong path)"
+    : "";
+}
+
+export async function getStreamers(): Promise<Streamers> {
+  try {
+    return await fetchApi("/streamers");
+  } catch (e) {
+    if (e instanceof ChessComApiError) {
+      const hint = streamersErrorHint(e.status);
+      if (hint) throw new ChessComApiError(e.status, e.message + hint);
+    }
+    throw e;
+  }
 }
 
 // ─── Leaderboards endpoint ─────────────────────────────────────────
