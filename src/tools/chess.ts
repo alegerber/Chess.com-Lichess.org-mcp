@@ -255,7 +255,8 @@ export function registerChessTools(server: McpServer): void {
           .number()
           .int()
           .min(2007)
-          .describe("Four-digit year (e.g. 2024)"),
+          .max(2100)
+          .describe("Four-digit year (2007-2100, e.g. 2024)"),
         month: z.number().int().min(1).max(12).describe("Month number (1-12)"),
       },
     },
@@ -285,7 +286,8 @@ export function registerChessTools(server: McpServer): void {
           .number()
           .int()
           .min(2007)
-          .describe("Four-digit year (e.g. 2024)"),
+          .max(2100)
+          .describe("Four-digit year (2007-2100, e.g. 2024)"),
         month: z.number().int().min(1).max(12).describe("Month number (1-12)"),
       },
     },
