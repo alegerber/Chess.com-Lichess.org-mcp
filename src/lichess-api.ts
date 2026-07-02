@@ -41,25 +41,59 @@ export function hasLichessToken(): boolean {
   return !!process.env.LICHESS_TOKEN?.trim();
 }
 
-async function fetchJson<T>(path: string): Promise<T> {
-  const url = `${BASE_URL}${path}`;
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: "application/json",
-      ...lichessAuthHeader(),
-    },
-    signal: AbortSignal.timeout(JSON_TIMEOUT_MS),
+/**
+ * Lichess rate-limits clients and answers bursts with 429, which asks for a
+ * full minute of quiet. Spell that out in the error so the model waits instead
+ * of retrying immediately and making it worse (#83).
+ */
+export function rateLimitHint(status: number): string {
+  return status === 429
+    ? " (rate limited — wait about a minute before calling Lichess tools again)"
+    : "";
+}
+
+/** Build the tagged error for a non-OK lichess.org response, hint included. */
+function lichessError(response: Response, url: string): LichessApiError {
+  return new LichessApiError(
+    response.status,
+    `Lichess API error ${response.status}: ${response.statusText} for ${url}${rateLimitHint(response.status)}`,
+  );
+}
+
+// Lichess documents "one request at a time" for lichess.org, but an MCP client
+// may invoke several tools in parallel. Serialize all lichess.org requests —
+// including body streaming — through a promise chain so parallel tool calls
+// don't provoke 429s (#83). The separate explorer/tablebase *.lichess.ovh
+// hosts are not subject to this rule and stay unserialized.
+let lichessChain: Promise<unknown> = Promise.resolve();
+
+/** Run `task` once every previously enqueued lichess.org request has settled. */
+export function lichessSerialized<T>(task: () => Promise<T>): Promise<T> {
+  const run = lichessChain.then(task, task);
+  // Keep the chain alive regardless of this task's outcome.
+  lichessChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+function fetchJson<T>(path: string): Promise<T> {
+  return lichessSerialized(async () => {
+    const url = `${BASE_URL}${path}`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+        ...lichessAuthHeader(),
+      },
+      signal: AbortSignal.timeout(JSON_TIMEOUT_MS),
+    });
+
+    if (!response.ok) throw lichessError(response, url);
+
+    return response.json() as Promise<T>;
   });
-
-  if (!response.ok) {
-    throw new LichessApiError(
-      response.status,
-      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
-    );
-  }
-
-  return response.json() as Promise<T>;
 }
 
 /**
@@ -67,25 +101,22 @@ async function fetchJson<T>(path: string): Promise<T> {
  * endpoints return PGN when asked via content negotiation (#46); the size cap is
  * applied by the caller's formatter (capText) so this stays a thin transport.
  */
-async function fetchText(path: string, accept: string): Promise<string> {
-  const url = `${BASE_URL}${path}`;
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: accept,
-      ...lichessAuthHeader(),
-    },
-    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+function fetchText(path: string, accept: string): Promise<string> {
+  return lichessSerialized(async () => {
+    const url = `${BASE_URL}${path}`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: accept,
+        ...lichessAuthHeader(),
+      },
+      signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+    });
+
+    if (!response.ok) throw lichessError(response, url);
+
+    return response.text();
   });
-
-  if (!response.ok) {
-    throw new LichessApiError(
-      response.status,
-      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
-    );
-  }
-
-  return response.text();
 }
 
 /**
@@ -113,44 +144,41 @@ export function parseNdjson<T>(text: string, maxLines?: number): T[] {
  * request) once that many lines have arrived, so unbounded endpoints (e.g. team
  * members) cannot buffer hundreds of MB into memory.
  */
-async function fetchNdjson<T>(path: string, maxLines?: number): Promise<T[]> {
-  const url = `${BASE_URL}${path}`;
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: "application/x-ndjson",
-      ...lichessAuthHeader(),
-    },
-    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
-  });
+function fetchNdjson<T>(path: string, maxLines?: number): Promise<T[]> {
+  return lichessSerialized(async () => {
+    const url = `${BASE_URL}${path}`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "application/x-ndjson",
+        ...lichessAuthHeader(),
+      },
+      signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+    });
 
-  if (!response.ok) {
-    throw new LichessApiError(
-      response.status,
-      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
-    );
-  }
+    if (!response.ok) throw lichessError(response, url);
 
-  // Unbounded callers are already limited by API params (max/nb) — read directly.
-  if (maxLines === undefined || !response.body) {
-    return parseNdjson<T>(await response.text());
-  }
-
-  // Bounded caller: read incrementally and stop once we have enough lines.
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    if (buffer.split("\n").length - 1 >= maxLines) {
-      await reader.cancel();
-      break;
+    // Unbounded callers are already limited by API params (max/nb) — read directly.
+    if (maxLines === undefined || !response.body) {
+      return parseNdjson<T>(await response.text());
     }
-  }
-  buffer += decoder.decode();
-  return parseNdjson<T>(buffer, maxLines);
+
+    // Bounded caller: read incrementally and stop once we have enough lines.
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      if (buffer.split("\n").length - 1 >= maxLines) {
+        await reader.cancel();
+        break;
+      }
+    }
+    buffer += decoder.decode();
+    return parseNdjson<T>(buffer, maxLines);
+  });
 }
 
 /**
@@ -158,46 +186,43 @@ async function fetchNdjson<T>(path: string, maxLines?: number): Promise<T[]> {
  * arrived. Tournament game exports are unbounded (a whole event), so this caps
  * the *download*, not just the displayed output, keeping memory bounded.
  */
-async function fetchTextBounded(
+function fetchTextBounded(
   path: string,
   accept: string,
   maxChars: number,
 ): Promise<string> {
-  const url = `${BASE_URL}${path}`;
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: accept,
-      ...lichessAuthHeader(),
-    },
-    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
-  });
+  return lichessSerialized(async () => {
+    const url = `${BASE_URL}${path}`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: accept,
+        ...lichessAuthHeader(),
+      },
+      signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+    });
 
-  if (!response.ok) {
-    throw new LichessApiError(
-      response.status,
-      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
-    );
-  }
+    if (!response.ok) throw lichessError(response, url);
 
-  if (!response.body) return (await response.text()).slice(0, maxChars);
+    if (!response.body) return (await response.text()).slice(0, maxChars);
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    if (buffer.length >= maxChars) {
-      await reader.cancel();
-      break;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      if (buffer.length >= maxChars) {
+        await reader.cancel();
+        break;
+      }
     }
-  }
-  buffer += decoder.decode();
-  // Honour the documented bound: the final flush can emit a few trailing bytes
-  // past maxChars, so clamp before returning.
-  return buffer.slice(0, maxChars);
+    buffer += decoder.decode();
+    // Honour the documented bound: the final flush can emit a few trailing bytes
+    // past maxChars, so clamp before returning.
+    return buffer.slice(0, maxChars);
+  });
 }
 
 /**
@@ -205,32 +230,25 @@ async function fetchTextBounded(
  * response with the requested Accept type. Used by the bulk endpoints (#43),
  * which take the IDs in the request body and content-negotiate JSON/NDJSON/PGN.
  */
-async function postText(
-  path: string,
-  body: string,
-  accept: string,
-): Promise<string> {
-  const url = `${BASE_URL}${path}`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: accept,
-      "Content-Type": "text/plain",
-      ...lichessAuthHeader(),
-    },
-    body,
-    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+function postText(path: string, body: string, accept: string): Promise<string> {
+  return lichessSerialized(async () => {
+    const url = `${BASE_URL}${path}`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: accept,
+        "Content-Type": "text/plain",
+        ...lichessAuthHeader(),
+      },
+      body,
+      signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+    });
+
+    if (!response.ok) throw lichessError(response, url);
+
+    return response.text();
   });
-
-  if (!response.ok) {
-    throw new LichessApiError(
-      response.status,
-      `Lichess API error ${response.status}: ${response.statusText} for ${url}`,
-    );
-  }
-
-  return response.text();
 }
 
 // ─── User endpoints ────────────────────────────────────────────────
@@ -1028,7 +1046,7 @@ async function fetchExplorer(
   if (!response.ok) {
     throw new LichessApiError(
       response.status,
-      `Lichess API error ${response.status}: ${response.statusText} for ${url}${ovhHostErrorHint(response.status)}`,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}${ovhHostErrorHint(response.status)}${rateLimitHint(response.status)}`,
     );
   }
 
@@ -1090,7 +1108,7 @@ async function fetchExplorerText(path: string): Promise<string> {
   if (!response.ok) {
     throw new LichessApiError(
       response.status,
-      `Lichess API error ${response.status}: ${response.statusText} for ${url}${ovhHostErrorHint(response.status)}`,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}${ovhHostErrorHint(response.status)}${rateLimitHint(response.status)}`,
     );
   }
 
@@ -1144,7 +1162,7 @@ export async function tablebaseLookup(
   if (!response.ok) {
     throw new LichessApiError(
       response.status,
-      `Lichess API error ${response.status}: ${response.statusText} for ${url}${ovhHostErrorHint(response.status)}`,
+      `Lichess API error ${response.status}: ${response.statusText} for ${url}${ovhHostErrorHint(response.status)}${rateLimitHint(response.status)}`,
     );
   }
   return response.json() as Promise<TablebaseResult>;

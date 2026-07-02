@@ -97,7 +97,11 @@ npm start            # Run the MCP server locally (stdio)
 - Docs: https://lichess.org/api
 - Auth: None required for public endpoints
 - Format: JSON or NDJSON (depends on endpoint; set `Accept` header accordingly)
-- Rate limits: One request at a time; 429 means wait ~1 minute
+- Rate limits: One request at a time; 429 means wait ~1 minute. The API client
+  enforces this by serializing all lichess.org requests through a promise chain
+  (`lichessSerialized` in `lichess-api.ts`); the explorer/tablebase
+  `*.lichess.ovh` hosts are separate services and stay unserialized. 429 errors
+  carry a wait-a-minute hint for the calling LLM.
 - Timestamps: Unix milliseconds
 - Note: Game export path is `/game/export/{id}` (no `/api/` prefix)
 

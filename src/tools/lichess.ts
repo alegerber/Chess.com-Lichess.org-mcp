@@ -150,6 +150,25 @@ export function formatOpeningExplorer(d: lichess.ExplorerResult): string {
   return lines.join("\n");
 }
 
+/**
+ * The explorer's player db needs to know whose games to query and which side
+ * they had; upstream answers a missing param with an opaque error, so validate
+ * here and tell the model exactly what to add (#83). Returns null when valid.
+ */
+export function explorerParamError(params: {
+  db: string;
+  player?: string;
+  color?: string;
+}): string | null {
+  if (params.db !== "player") return null;
+  const missing = [
+    !params.player && "'player' (the Lichess username whose games to query)",
+    !params.color && "'color' (the side that player had)",
+  ].filter(Boolean);
+  if (missing.length === 0) return null;
+  return `db=player requires the ${missing.join(" and ")} parameter${missing.length > 1 ? "s" : ""}.`;
+}
+
 /** Render a masters OTB game PGN (#60), size-capped, with an empty-state guard. */
 export function formatMastersGamePgn(pgn: string): string {
   return pgn.trim() === "" ? "No PGN available for this game." : capPgn(pgn);
@@ -1673,8 +1692,10 @@ export function registerLichessTools(server: McpServer): void {
           .describe("Number of next moves to return (default upstream)"),
       },
     },
-    ({ db, fen, play, variant, speeds, ratings, player, color, moves }) =>
-      call(
+    ({ db, fen, play, variant, speeds, ratings, player, color, moves }) => {
+      const paramError = explorerParamError({ db, player, color });
+      if (paramError) return text(paramError, true);
+      return call(
         () =>
           lichess.openingExplorer({
             db,
@@ -1688,7 +1709,8 @@ export function registerLichessTools(server: McpServer): void {
             moves,
           }),
         formatOpeningExplorer,
-      ),
+      );
+    },
   );
 
   server.registerTool(
