@@ -50,6 +50,26 @@ export function formatUser(u: lichess.LichessUser): string {
   return lines.join("\n");
 }
 
+/**
+ * One line per user for the status lookup. Lichess answers unknown usernames
+ * with an empty array — return an explicit message instead of empty text (#82).
+ */
+export function formatUserStatuses(statuses: lichess.UserStatus[]): string {
+  if (statuses.length === 0)
+    return "No matching users found for the given usernames.";
+  const lines = statuses.map((s) => {
+    const flags = [
+      s.online ? "online" : "offline",
+      s.playing ? "playing" : null,
+      s.streaming ? "streaming" : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    return `${s.title ? s.title + " " : ""}${s.name}: ${flags}`;
+  });
+  return lines.join("\n");
+}
+
 /** Compact list of the teams a user belongs to (#30, /api/team/of). */
 export function formatUserTeams(teams: lichess.LichessTeam[]): string {
   if (teams.length === 0) return "This user is not a member of any teams.";
@@ -171,7 +191,7 @@ export function explorerParamError(params: {
 
 /** Render a masters OTB game PGN (#60), size-capped, with an empty-state guard. */
 export function formatMastersGamePgn(pgn: string): string {
-  return pgn.trim() === "" ? "No PGN available for this game." : capPgn(pgn);
+  return pgn.trim() === "" ? "No PGN available for this game." : capText(pgn);
 }
 
 /** Render a Swiss tournament's TRF export (#63), size-capped, with an empty guard. */
@@ -267,16 +287,6 @@ export function formatUsersBulk(users: lichess.LichessUser[]): string {
     return `${title}${u.username}${ratings ? ` — ${ratings}` : ""}${games}`;
   });
   return `Found ${users.length} users:\n${lines.join("\n")}`;
-}
-
-// Char budget for raw PGN output so a whole-event export can't blow the window.
-const PGN_MAX_CHARS = 50_000;
-
-function capPgn(pgn: string): string {
-  return pgn.length <= PGN_MAX_CHARS
-    ? pgn
-    : pgn.slice(0, PGN_MAX_CHARS) +
-        `\n… truncated (${pgn.length - PGN_MAX_CHARS} more characters not shown)`;
 }
 
 export function formatSwiss(s: lichess.SwissInfo): string {
@@ -512,27 +522,13 @@ export function registerLichessTools(server: McpServer): void {
       inputSchema: {
         usernames: z
           .array(z.string())
+          .min(1)
           .max(100)
-          .describe("Lichess usernames (up to 100)"),
+          .describe("Lichess usernames (1-100)"),
       },
     },
     ({ usernames }) =>
-      call(
-        () => lichess.getUserStatus(usernames),
-        (statuses) => {
-          const lines = statuses.map((s) => {
-            const flags = [
-              s.online ? "online" : "offline",
-              s.playing ? "playing" : null,
-              s.streaming ? "streaming" : null,
-            ]
-              .filter(Boolean)
-              .join(", ");
-            return `${s.title ? s.title + " " : ""}${s.name}: ${flags}`;
-          });
-          return lines.join("\n");
-        },
-      ),
+      call(() => lichess.getUserStatus(usernames), formatUserStatuses),
   );
 
   server.registerTool(
@@ -1501,7 +1497,7 @@ export function registerLichessTools(server: McpServer): void {
         study_id: z.string().describe("Lichess study ID (8 characters)"),
       },
     },
-    ({ study_id }) => call(() => lichess.exportStudyPgn(study_id), capPgn),
+    ({ study_id }) => call(() => lichess.exportStudyPgn(study_id), capText),
   );
 
   server.registerTool(
@@ -1517,7 +1513,7 @@ export function registerLichessTools(server: McpServer): void {
       },
     },
     ({ study_id, chapter_id }) =>
-      call(() => lichess.exportStudyChapterPgn(study_id, chapter_id), capPgn),
+      call(() => lichess.exportStudyChapterPgn(study_id, chapter_id), capText),
   );
 
   // ── Broadcasts / live relays ────────────────────────────────────────
@@ -1576,7 +1572,7 @@ export function registerLichessTools(server: McpServer): void {
       },
     },
     ({ round_id }) =>
-      call(() => lichess.getBroadcastRoundPgn(round_id), capPgn),
+      call(() => lichess.getBroadcastRoundPgn(round_id), capText),
   );
 
   server.registerTool(
@@ -1633,7 +1629,7 @@ export function registerLichessTools(server: McpServer): void {
         (pgn) =>
           pgn.trim() === ""
             ? "No games found for this broadcast."
-            : capPgn(pgn),
+            : capText(pgn),
       ),
   );
 
@@ -1753,7 +1749,7 @@ export function registerLichessTools(server: McpServer): void {
 function renderGames(data: unknown[] | string, asPgn: boolean): string {
   if (asPgn) {
     const pgn = String(data).trim();
-    return pgn === "" ? "No games found for this tournament." : capPgn(pgn);
+    return pgn === "" ? "No games found for this tournament." : capText(pgn);
   }
   const games = data as unknown[];
   return games.length === 0
