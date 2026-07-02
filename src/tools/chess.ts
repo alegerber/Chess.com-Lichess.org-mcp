@@ -8,6 +8,7 @@ import {
   text,
   errorResult,
   formatList,
+  capText,
 } from "../format.js";
 
 // All tools are read-only and talk to an external API.
@@ -297,11 +298,7 @@ export function registerChessTools(server: McpServer): void {
           if (trimmed === "")
             return `${username} played no games in ${year}/${mm}.`;
           // Cap raw PGN so a busy month can't blow the context window.
-          const max = 50_000;
-          return trimmed.length <= max
-            ? trimmed
-            : trimmed.slice(0, max) +
-                `\n… truncated (${trimmed.length - max} more characters not shown)`;
+          return capText(trimmed);
         },
       );
     },

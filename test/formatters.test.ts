@@ -266,3 +266,22 @@ test("formatTournamentTeams caps a large team list", () => {
   assert.match(out, /40 teams:/);
   assert.match(out, /more teams not shown/);
 });
+
+// ─── formatUserStatuses (#82) ──────────────────────────────────────
+
+test("formatUserStatuses renders one line per user with flags", () => {
+  const out = lichessTools.formatUserStatuses([
+    { id: "a", name: "Alice", title: "GM", online: true, playing: true },
+    { id: "b", name: "Bob" },
+  ]);
+  assert.match(out, /GM Alice: online, playing/);
+  assert.match(out, /Bob: offline/);
+});
+
+test("formatUserStatuses reports unknown usernames instead of empty text", () => {
+  // Lichess answers unknown usernames with an empty array; the tool must not
+  // return an empty content block.
+  const out = lichessTools.formatUserStatuses([]);
+  assert.notEqual(out, "");
+  assert.match(out, /No matching users/);
+});

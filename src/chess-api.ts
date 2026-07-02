@@ -5,9 +5,10 @@ const BASE_URL = "https://api.chess.com/pub";
 const USER_AGENT = `chess-com-lichess-org-mcp/${VERSION} (MCP Server; https://github.com/alegerber/chess-com-lichess-org-mcp)`;
 
 const JSON_TIMEOUT_MS = 10_000;
-// A whole month of games can be a large PGN download, so allow longer than the
-// JSON endpoints (#47).
-const PGN_TIMEOUT_MS = 30_000;
+// A whole month of games is a large download in either format — the JSON
+// archive embeds the full PGN per game — so both monthly-archive endpoints get
+// a longer budget than the small JSON endpoints (#47, #82).
+const ARCHIVE_TIMEOUT_MS = 30_000;
 
 export class ChessComApiError extends Error {
   constructor(
@@ -19,14 +20,17 @@ export class ChessComApiError extends Error {
   }
 }
 
-async function fetchApi<T>(path: string): Promise<T> {
+async function fetchApi<T>(
+  path: string,
+  timeoutMs = JSON_TIMEOUT_MS,
+): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const response = await fetch(url, {
     headers: {
       "User-Agent": USER_AGENT,
       Accept: "application/json",
     },
-    signal: AbortSignal.timeout(JSON_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   if (!response.ok) {
@@ -48,7 +52,7 @@ async function fetchText(path: string): Promise<string> {
       "User-Agent": USER_AGENT,
       Accept: "application/x-chess-pgn, text/plain, */*",
     },
-    signal: AbortSignal.timeout(PGN_TIMEOUT_MS),
+    signal: AbortSignal.timeout(ARCHIVE_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -142,6 +146,7 @@ export function getMonthlyArchive(
   const mm = String(month).padStart(2, "0");
   return fetchApi(
     `/player/${encodeURIComponent(username.toLowerCase())}/games/${year}/${mm}`,
+    ARCHIVE_TIMEOUT_MS,
   );
 }
 
