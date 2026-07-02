@@ -49,6 +49,38 @@ test("formatOpeningExplorer reports an empty position", () => {
   assert.match(out, /No moves in this database/);
 });
 
+// ─── explorerParamError (#83) ──────────────────────────────────────
+// db=player requires player and color upstream; a missing param must fail
+// with a clear validation message, not an opaque upstream error.
+
+test("explorerParamError passes valid inputs through", () => {
+  assert.equal(lichessTools.explorerParamError({ db: "masters" }), null);
+  assert.equal(lichessTools.explorerParamError({ db: "lichess" }), null);
+  assert.equal(
+    lichessTools.explorerParamError({
+      db: "player",
+      player: "Someone",
+      color: "white",
+    }),
+    null,
+  );
+});
+
+test("explorerParamError names every missing db=player parameter", () => {
+  const both = lichessTools.explorerParamError({ db: "player" });
+  assert.match(String(both), /'player'/);
+  assert.match(String(both), /'color'/);
+  assert.match(String(both), /parameters\.$/);
+
+  const colorOnly = lichessTools.explorerParamError({
+    db: "player",
+    player: "Someone",
+  });
+  assert.match(String(colorOnly), /'color'/);
+  assert.doesNotMatch(String(colorOnly), /'player'/);
+  assert.match(String(colorOnly), /parameter\.$/);
+});
+
 test("formatOpeningExplorer tolerates a response missing totals (no NaN)", () => {
   // A malformed/empty payload must not render NaN or undefined.
   const out = lichessTools.formatOpeningExplorer({

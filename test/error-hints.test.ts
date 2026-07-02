@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ovhHostErrorHint } from "../src/lichess-api.js";
+import { ovhHostErrorHint, rateLimitHint } from "../src/lichess-api.js";
 import { streamersErrorHint } from "../src/chess-api.js";
 
 // ─── ovhHostErrorHint ──────────────────────────────────────────────
@@ -22,6 +22,22 @@ test("ovhHostErrorHint also covers 403", () => {
 test("ovhHostErrorHint stays silent for other statuses", () => {
   assert.equal(ovhHostErrorHint(404), "");
   assert.equal(ovhHostErrorHint(429), "");
+});
+
+// ─── rateLimitHint ─────────────────────────────────────────────────
+// Lichess answers bursts with 429 and expects a full minute of quiet. Without
+// the hint a model is likely to retry immediately and make things worse (#83).
+
+test("rateLimitHint tells the model to wait a minute on 429", () => {
+  const hint = rateLimitHint(429);
+  assert.match(hint, /rate limited/i);
+  assert.match(hint, /minute/i);
+});
+
+test("rateLimitHint stays silent for other statuses", () => {
+  assert.equal(rateLimitHint(200), "");
+  assert.equal(rateLimitHint(404), "");
+  assert.equal(rateLimitHint(503), "");
 });
 
 // ─── streamersErrorHint ────────────────────────────────────────────
