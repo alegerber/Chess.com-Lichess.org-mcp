@@ -1,6 +1,6 @@
 {
   "name": "chess-com-lichess-org-mcp",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "A TypeScript-based MCP server that exposes the Chess.com or Lichess.org public API to AI assistants — fetch player profiles, game history, ratings, and puzzle data via the Model Context Protocol",
   "main": "dist/index.js",
   "bin": {
