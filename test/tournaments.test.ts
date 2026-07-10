@@ -100,6 +100,26 @@ test("formatSimuls summarizes counts and lists active simuls", () => {
   assert.match(out, /5 applicants/);
 });
 
+test("formatSimuls counts and lists pending simuls (#86)", () => {
+  const data = {
+    pending: [
+      {
+        id: "abc",
+        name: "Waiting",
+        fullName: "Waiting simul",
+        host: { name: "someHost", id: "somehost" },
+      },
+    ] as Simul[],
+    created: [] as Simul[],
+    started: [] as Simul[],
+    finished: [] as Simul[],
+  };
+  const out = lichessTools.formatSimuls(data);
+  assert.match(out, /Pending: 1/);
+  assert.match(out, /Waiting simul by someHost/);
+  assert.doesNotMatch(out, /No active simuls/);
+});
+
 test("formatSimuls reports when nothing is active", () => {
   const out = lichessTools.formatSimuls({
     pending: [],

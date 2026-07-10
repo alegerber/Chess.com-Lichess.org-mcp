@@ -353,14 +353,18 @@ const SIMUL_LIST_CAP = 20;
 
 export function formatSimuls(data: lichess.SimulsResponse): string {
   const summary = [
+    `Pending: ${data.pending?.length ?? 0}`,
     `Created: ${data.created?.length ?? 0}`,
     `Started: ${data.started?.length ?? 0}`,
     `Finished: ${data.finished?.length ?? 0}`,
   ].join("\n");
-  const active = [...(data.started ?? []), ...(data.created ?? [])].slice(
-    0,
-    SIMUL_LIST_CAP,
-  );
+  // Everything not yet finished counts as active (#86): live simuls first,
+  // then ones open for applicants, then pending ones awaiting their host.
+  const active = [
+    ...(data.started ?? []),
+    ...(data.created ?? []),
+    ...(data.pending ?? []),
+  ].slice(0, SIMUL_LIST_CAP);
   if (active.length === 0) return `${summary}\n\nNo active simuls.`;
   const lines = active.map((s) => {
     const applicants =

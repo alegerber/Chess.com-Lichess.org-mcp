@@ -140,6 +140,18 @@ export function parseNdjson<T>(text: string, maxLines?: number): T[] {
 }
 
 /**
+ * Count complete (newline-terminated), non-blank lines in an NDJSON buffer.
+ * The tail after the last newline is still arriving and doesn't count. Blank
+ * lines are excluded because parseNdjson skips them — counting raw newlines
+ * could cancel the stream before maxLines parseable records arrived (#86).
+ */
+export function countCompleteNdjsonLines(buffer: string): number {
+  const segments = buffer.split("\n");
+  segments.pop();
+  return segments.filter((line) => line.trim() !== "").length;
+}
+
+/**
  * Stream an NDJSON endpoint. When maxLines is set, stop reading (and abort the
  * request) once that many lines have arrived, so unbounded endpoints (e.g. team
  * members) cannot buffer hundreds of MB into memory.
@@ -171,7 +183,7 @@ function fetchNdjson<T>(path: string, maxLines?: number): Promise<T[]> {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      if (buffer.split("\n").length - 1 >= maxLines) {
+      if (countCompleteNdjsonLines(buffer) >= maxLines) {
         await reader.cancel();
         break;
       }
