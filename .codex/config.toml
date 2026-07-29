@@ -1,0 +1,3 @@
+[mcp_servers.chess-mcp]
+command = "node"
+args = ["/Users/agerber/github/chess-com-lichess-org-mcp/dist/index.js"]
